@@ -3,6 +3,7 @@ import copy
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from types import MethodType
+from typing import Any, Callable, Dict, Hashable, List, Optional, Union
 
 import torch
 import torch.nn as nn
@@ -11,7 +12,10 @@ from mmcv.runner import BaseModule
 from ordered_set import OrderedSet
 from torch.nn.modules.batchnorm import _BatchNorm
 
+# TODO: import to __init__.py
+from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import PRUNERS
+from .types import CHANNEL_SPACES_TYPE, SUBNET_TYPE
 from .utils import SwitchableBatchNorm2d
 
 # These grad_fn pattern are flags of specific a nn.Module
@@ -82,14 +86,14 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
             string in except_start_keys will not be prune.
     """
 
-    def __init__(self, except_start_keys=['head.fc']):
+    def __init__(self, except_start_keys: List[str] = ['head.fc']) -> None:
         super(StructurePruner, self).__init__()
         if except_start_keys is None:
             self.except_start_keys = list()
         else:
             self.except_start_keys = except_start_keys
 
-    def prepare_from_supernet(self, supernet):
+    def prepare_from_supernet(self, supernet: BaseArchitecture) -> None:
         """Prepare for pruning."""
 
         module2name = OrderedDict()
@@ -152,7 +156,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
         self.channel_spaces = self.build_channel_spaces(name2module)
 
     @abstractmethod
-    def sample_subnet(self):
+    def sample_subnet(self) -> SUBNET_TYPE:
         """Sample a subnet from the supernet.
 
         Returns:
@@ -162,7 +166,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
         """
         pass
 
-    def get_space_id(self, module_name):
+    def get_space_id(self, module_name: str) -> Optional[Union[str, Dict]]:
         """Get the corresponding space_id of the module_name.
 
         The modules who share the same space_id will share the same out_mask.
@@ -201,7 +205,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
             space_id = module_name
         return space_id
 
-    def set_subnet(self, subnet_dict):
+    def set_subnet(self, subnet_dict: SUBNET_TYPE) -> None:
         """Modify the in_mask and out_mask of modules in supernet according to
         subnet_dict.
 
@@ -232,7 +236,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
             # 2. there is only one element in parents, ``concat`` or ``chunk``
             # In case 1, all the ``Conv2d`` share the same space_id and
             # out_mask.
-            # So in all cases, we only need the very first element in parents
+            # So in all cases, we only need the every first element in parents
             parent = parents[0]
             space_id = self.get_space_id(parent)
 
@@ -247,7 +251,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
                 module.in_mask = subnet_dict[space_id].to(
                     module.in_mask.device)
 
-    def export_subnet(self):
+    def export_subnet(self) -> Dict[Hashable, Any]:
         """Generate subnet configs according to the in_mask and out_mask of a
         module."""
         channel_cfg = dict()
@@ -268,7 +272,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
 
         return channel_cfg
 
-    def set_max_channel(self):
+    def set_max_channel(self) -> None:
         """Set the number of channels each layer to maximum."""
         subnet_dict = dict()
         for space_id, out_mask in self.channel_spaces.items():
@@ -277,11 +281,12 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
         self.set_subnet(subnet_dict)
 
     @abstractmethod
-    def set_min_channel(self):
+    def set_min_channel(self) -> None:
         """Set the number of channels each layer to minimum."""
         pass
 
-    def find_make_group_parser(self, node_name, name2module):
+    def find_make_group_parser(self, node_name: str,
+                               name2module: Dict[str, nn.Module]) -> None:
         """Find the corresponding make_group_parser according to the
         ``node_name``"""
         if 'concat' in node_name and node_name not in name2module:
@@ -364,10 +369,10 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
         return groups
 
     @staticmethod
-    def modify_conv_forward(module):
+    def modify_conv_forward(module: nn.Module) -> Callable[..., Any]:
         """Modify the forward method of a conv layer."""
 
-        def modified_forward(self, feature):
+        def modified_forward(self, feature: torch.Tensor) -> torch.Tensor:
             feature = feature * self.in_mask
             return F.conv2d(feature, self.weight, self.bias, self.stride,
                             self.padding, self.dilation, self.groups)
@@ -375,10 +380,10 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
         return MethodType(modified_forward, module)
 
     @staticmethod
-    def modify_fc_forward(module):
+    def modify_fc_forward(module: nn.Module) -> Callable[..., Any]:
         """Modify the forward method of a linear layer."""
 
-        def modified_forward(self, feature):
+        def modified_forward(self, feature: torch.Tensor) -> torch.Tensor:
             if not len(self.in_mask.shape) == len(self.out_mask.shape):
                 self.in_mask = self.in_mask.reshape(self.in_mask.shape[:2])
 
@@ -387,7 +392,12 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
 
         return MethodType(modified_forward, module)
 
-    def add_pruning_attrs(self, module):
+    # TODO: split function
+    # split function to `register_mask` & `modify_module_forward`
+    # to avoid judge `is_modify_forward` every time
+    def add_pruning_attrs(self,
+                          module: nn.Module,
+                          is_modify_forward: bool = True) -> None:
         """Add masks to a ``nn.Module``."""
         if type(module).__name__ == 'Conv2d':
             module.register_buffer(
@@ -396,13 +406,15 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
             module.register_buffer(
                 'out_mask',
                 module.weight.new_ones((1, module.out_channels, 1, 1), ))
-            module.forward = self.modify_conv_forward(module)
+            if is_modify_forward:
+                module.forward = self.modify_conv_forward(module)
         if type(module).__name__ == 'Linear':
             module.register_buffer(
                 'in_mask', module.weight.new_ones((1, module.in_features), ))
             module.register_buffer(
                 'out_mask', module.weight.new_ones((1, module.out_features), ))
-            module.forward = self.modify_fc_forward(module)
+            if is_modify_forward:
+                module.forward = self.modify_fc_forward(module)
         if isinstance(module, nn.modules.batchnorm._BatchNorm):
             module.register_buffer(
                 'out_mask',
@@ -435,7 +447,8 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
                 node2parents[leaf_name] = OrderedSet()
         return node2parents
 
-    def build_channel_spaces(self, name2module):
+    def build_channel_spaces(
+            self, name2module: Dict[str, nn.Module]) -> CHANNEL_SPACES_TYPE:
         """Build channel search space.
 
         Args:
