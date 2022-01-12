@@ -67,10 +67,10 @@ class ResRep(BaseAlgorithm):
         optimizer.zero_grad()
         losses = self(**data)
         loss, log_vars = self._parse_losses(losses)
+        loss.backward()
 
         self.pruner.gradient_reset()
 
-        loss.backward()
         optimizer.step()
 
         outputs = dict(
