@@ -30,7 +30,8 @@ algorithm = dict(
         type='ResRepPruner',
         flops_constraint=2000000000,
         begin_granularity=4,
-        lasso_strength=1e-4),
+        lasso_strength=1e-4,
+        input_shape=(3, 224, 224)),
     before_update_mask_iter=12345)
 
 runner = dict(type='EpochBasedRunner', max_epochs=50)
