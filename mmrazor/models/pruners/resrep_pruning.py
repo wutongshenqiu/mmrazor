@@ -11,7 +11,6 @@ from mmcv.cnn import get_model_complexity_info
 # TODO: import to __init__.py
 from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import PRUNERS
-from mmrazor.models.utils import add_prefix
 from .structure_pruning import StructurePruner
 from .types import METRIC_DICT_TYPE, SUBNET_TYPE
 
