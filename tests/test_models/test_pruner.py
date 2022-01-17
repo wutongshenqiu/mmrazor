@@ -147,6 +147,7 @@ def test_resrep_pruner() -> None:
     _test_resrep_pruner_init(pruner_cfg)
     _test_resrep_pruner_prepare_from_supernet(pruner_cfg, architecture_cfg)
     _test_resrep_pruner_modify_conv_forward(pruner_cfg, architecture_cfg)
+    _test_resrep_pruner_update_mask(pruner_cfg, architecture_cfg)
 
 
 def _test_resrep_pruner_init(pruner_cfg) -> None:
@@ -238,3 +239,65 @@ def _test_resrep_pruner_modify_conv_forward(pruner_cfg,
                 torch.cat(module_input_list[j]))
             torch.equal(
                 compactor(*module_input_list[i]), module_output_list[j])
+
+
+def _test_resrep_pruner_update_mask(pruner_cfg, architecture_cfg) -> None:
+    pruner = PRUNERS.build(pruner_cfg)
+    architecture = ARCHITECTURES.build(architecture_cfg)
+
+    pruner.prepare_from_supernet(architecture)
+
+    compactor_name = random.choice(list(pruner._compactors.keys()))
+    compactor = pruner._compactors[compactor_name]
+
+    with torch.no_grad():
+        compactor._layer.weight[0, :, :, :] += 9999.
+        compactor._layer.weight[1, :, :, :] += 999.
+        compactor._layer.weight[2, :, :, :] += 99.
+        compactor._layer.weight[3, :, :, :] += 9.
+
+        metric_list = compactor.get_metric_list()
+        metric_dict = pruner._get_metric_dict()
+
+        for i in range(4):
+            assert abs(metric_dict[(compactor_name, i)] -
+                       metric_list[i]) < 1e-8
+
+    with torch.no_grad():
+        for i in range(pruner._begin_granularity + 10):
+            compactor._layer.weight[i, :, :, :] = 0.
+
+        compactors_mask = pruner.sample_subnet(architecture)
+        for cn, compactor_mask in compactors_mask.items():
+            if cn == compactor_name:
+                assert pruner._get_mask_deactivated_filter_nums(
+                    compactor_mask) == pruner._begin_granularity
+            else:
+                pruner._get_mask_deactivated_filter_nums(compactor_mask) == 0
+
+        pruner.set_subnet(compactors_mask)
+
+        for cn, c in pruner._compactors.items():
+            assert torch.equal(c.mask, compactors_mask[cn])
+
+        corresponding_modules = []
+        for mn, cn in pruner._module2compactor['out_mask'].items():
+            module = pruner.name2module[mn]
+            if cn == compactor_name:
+                corresponding_modules.append(mn)
+                assert pruner._get_mask_deactivated_filter_nums(
+                    module.out_mask) == pruner._begin_granularity
+            else:
+                assert pruner._get_mask_deactivated_filter_nums(
+                    module.out_mask) == 0
+        assert sorted(corresponding_modules) == \
+            sorted(pruner._compactor2modules[compactor_name])
+
+        for mn, cn in pruner._module2compactor['in_mask'].items():
+            module = pruner.name2module[mn]
+            if cn == compactor_name:
+                assert pruner._get_mask_deactivated_filter_nums(
+                    module.in_mask) == pruner._begin_granularity
+            else:
+                assert pruner._get_mask_deactivated_filter_nums(
+                    module.in_mask) == 0
