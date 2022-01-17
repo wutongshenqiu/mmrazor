@@ -34,7 +34,7 @@ class ResRep(BaseAlgorithm):
             pseudo_pruner = build_pruner(pruner)
             pseudo_architecture = copy.deepcopy(self.architecture)
             pseudo_pruner.prepare_from_supernet(pseudo_architecture)
-            subnet_dict = pseudo_pruner.sample_subnet()
+            subnet_dict = pseudo_pruner.sample_subnet(pseudo_architecture)
             pseudo_pruner.set_subnet(subnet_dict)
             subnet_dict = pseudo_pruner.export_subnet()
 
@@ -67,10 +67,10 @@ class ResRep(BaseAlgorithm):
         optimizer.zero_grad()
         losses = self(**data)
         loss, log_vars = self._parse_losses(losses)
+        loss.backward()
 
         self.pruner.gradient_reset()
 
-        loss.backward()
         optimizer.step()
 
         outputs = dict(
