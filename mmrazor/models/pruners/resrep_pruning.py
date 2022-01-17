@@ -1,7 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
 from types import MethodType
-from typing import Any, Callable, Dict, Hashable, Iterable, List
+from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional
 
 import torch
 import torch.nn as nn
@@ -71,15 +71,35 @@ class CompactorLayer(nn.Module):
 class ResRepPruner(StructurePruner):
     # TODO: update docs
     def __init__(self,
-                 flops_constraint: float,
+                 flops_constraint: Optional[float] = None,
+                 flops_ratio: Optional[float] = None,
                  begin_granularity: int = 4,
                  least_channel_nums: int = 1,
                  lasso_strength: float = 1e-4,
                  input_shape: Iterable[int] = (3, 224, 224),
                  **kwargs: Any) -> None:
+        if (flops_constraint is None and flops_ratio is None) or \
+                (flops_constraint is not None and flops_ratio is not None):
+            raise ValueError(
+                'One and only one of `flops_constraint` or `flops_ratio` '
+                'must be specified')
+        if flops_ratio <= 0 or flops_ratio > 1:
+            raise ValueError(
+                f'`flops_ratio` must between 0 and 1, but got `{flops_ratio}`')
+        if least_channel_nums < 1:
+            raise ValueError(f'`least_channel_nums` must greater than 0, '
+                             f'but got `{least_channel_nums}`')
+        if begin_granularity < 1:
+            raise ValueError(f'`begin_granularity` must greater than 0, '
+                             f'but got `{begin_granularity}`')
+        if lasso_strength <= 0:
+            raise ValueError(f'`lasso_strength` must greater than 0, '
+                             f'but got `{lasso_strength}`')
+
         super(ResRepPruner, self).__init__(**kwargs)
 
         self._flops_constraint = flops_constraint
+        self._flops_ratio = flops_ratio
         self._begin_granularity = begin_granularity
         self._least_channel_nums = least_channel_nums
         self._lasso_strength = lasso_strength
@@ -226,7 +246,14 @@ class ResRepPruner(StructurePruner):
                 format(flops_model.__class__.__name__))
 
         flops, params = get_model_complexity_info(
-            flops_model, self._input_shape, print_per_layer_stat=False)
+            flops_model,
+            self._input_shape,
+            print_per_layer_stat=False,
+            as_strings=False)
+        self._original_flops: float = flops
+        if self._flops_ratio:
+            self._flops_constraint = flops * self._flops_ratio
+
         flops_lookup = dict()
         for name, module in flops_model.named_modules():
             flops = getattr(module, '__flops__', 0)
@@ -413,10 +440,10 @@ class ResRepPruner(StructurePruner):
     # TODO
     # should record which channel have been set to 0
     def export_subnet(self) -> Dict[Hashable, Any]:
-        pass
+        return super().export_subnet()
 
     # TODO
     # should load channel that has been set to 0
     def deploy_subnet(self, supernet: BaseArchitecture,
                       channel_cfg: Dict[Hashable, Any]) -> None:
-        pass
+        super().deploy_subnet(supernet=supernet, channel_cfg=channel_cfg)
