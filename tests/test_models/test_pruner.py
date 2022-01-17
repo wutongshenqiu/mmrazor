@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import random
 from copy import deepcopy
 
 import pytest
@@ -6,6 +7,7 @@ import torch
 from mmcv import ConfigDict, digit_version
 
 from mmrazor.models.builder import ARCHITECTURES, PRUNERS
+from mmrazor.models.pruners.resrep_pruning import CompactorLayer
 
 
 def test_ratio_pruner():

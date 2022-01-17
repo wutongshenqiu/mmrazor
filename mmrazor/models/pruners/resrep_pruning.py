@@ -91,14 +91,14 @@ class ResRepPruner(StructurePruner):
         self._init_flops(supernet)
         super().prepare_from_supernet(supernet)
 
-        group2module = dict()
+        group2modules = dict()
         for module_name, group in self.module2group.items():
-            module = self.name2module[module_name]
             try:
-                group2module[group].append(module)
+                group2modules[group].append(module_name)
             except KeyError:
-                group2module[group] = [module]
+                group2modules[group] = [module_name]
 
+        compactor2modules: Dict[str, List[str]] = dict()
         compactors = nn.ModuleDict()
         for name, out_mask in self.channel_spaces.items():
             out_channels = out_mask.size(1)
@@ -107,31 +107,36 @@ class ResRepPruner(StructurePruner):
             compactors[compactor_name] = CompactorLayer(
                 feature_nums=out_channels, name=compactor_name)
 
-            if name in group2module:
-                modules = group2module[name]
+            if name in group2modules:
+                modules_name = group2modules[name]
             else:
-                modules = [self.name2module[name]]
+                modules_name = [name]
 
-            for module in modules:
+            for module_name in modules_name:
+                module = self.name2module[module_name]
                 module.__compactor_name__ = compactor_name
                 if type(module).__name__ == 'Conv2d' and module.groups == 1:
                     module.forward = self.modify_conv_forward(
-                        module=module, compactors=compactors)
+                        module=module, compactor=compactors[compactor_name])
+                try:
+                    compactor2modules[compactor_name].append(module_name)
+                except KeyError:
+                    compactor2modules[compactor_name] = [module_name]
 
         self._compactors: Dict[Hashable, CompactorLayer] = compactors
         self._module2compactor = self._map_conv_compactor()
+        self._compactor2modules = compactor2modules
 
     # TODO
     # pass single compactor instead of compactors
     @staticmethod
-    def modify_conv_forward(
-            module, compactors: Dict[str, nn.Module]) -> Callable[..., Any]:
+    def modify_conv_forward(module,
+                            compactor: CompactorLayer) -> Callable[..., Any]:
         """Modify the forward method of a conv layer."""
 
         def modified_forward(self, feature: torch.Tensor) -> torch.Tensor:
             out = F.conv2d(feature, self.weight, self.bias, self.stride,
                            self.padding, self.dilation, self.groups)
-            compactor = compactors[self.__compactor_name__]
             out = compactor(out)
 
             return out
@@ -221,7 +226,7 @@ class ResRepPruner(StructurePruner):
                 format(flops_model.__class__.__name__))
 
         flops, params = get_model_complexity_info(
-            flops_model, self._input_shape, print_per_layer_stat=True)
+            flops_model, self._input_shape, print_per_layer_stat=False)
         flops_lookup = dict()
         for name, module in flops_model.named_modules():
             flops = getattr(module, '__flops__', 0)
