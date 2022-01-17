@@ -154,6 +154,7 @@ def _test_resrep_pruner_init(pruner_cfg) -> None:
     pruner = PRUNERS.build(pruner_cfg)
 
     assert hasattr(pruner, '_flops_constraint')
+    assert hasattr(pruner, '_flops_ratio')
     assert hasattr(pruner, '_begin_granularity')
     assert hasattr(pruner, '_least_channel_nums')
     assert hasattr(pruner, '_lasso_strength')
