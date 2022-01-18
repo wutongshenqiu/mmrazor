@@ -64,7 +64,7 @@ class ResRep(BaseAlgorithm):
                 accumulate gradient
         """
         self._update_iter(count=1)
-        if self.iter > self.before_update_mask_iter:
+        if self.iter > self._before_update_mask_iter:
             self.pruner.update_mask(self.architecture)
 
         optimizer.zero_grad()
