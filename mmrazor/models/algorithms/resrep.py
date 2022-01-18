@@ -17,8 +17,8 @@ class ResRep(BaseAlgorithm):
         super(ResRep, self).__init__(**kwargs)
 
         self._before_update_mask_iter = before_update_mask_iter
-        # TODO: support checkpoint?
-        self._iter = 0
+        # TODO: use hook
+        self.register_buffer('_current_iter', torch.LongTensor([0]))
 
     def _init_pruner(self, pruner: Dict) -> None:
         """Build registered pruners and make preparations.
@@ -63,10 +63,9 @@ class ResRep(BaseAlgorithm):
             optimizer (:obj:`torch.optim.Optimizer`): The optimizer to
                 accumulate gradient
         """
+        self._update_iter(count=1)
         if self.iter > self.before_update_mask_iter:
             self.pruner.update_mask(self.architecture)
-        # TODO
-        self._iter += 1
 
         optimizer.zero_grad()
         losses = self(**data)
@@ -86,9 +85,7 @@ class ResRep(BaseAlgorithm):
     # https://github.com/open-mmlab/mmcv/issues/1242
     @property
     def iter(self) -> int:
-        """Current iterations.
+        return self._current_iter.item()
 
-        Returns:
-            int: [description]
-        """
-        return self._iter
+    def _update_iter(self, count: int = 1) -> None:
+        self._current_iter += count
