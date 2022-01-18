@@ -17,6 +17,8 @@ class ResRep(BaseAlgorithm):
         super(ResRep, self).__init__(**kwargs)
 
         self._before_update_mask_iter = before_update_mask_iter
+        # TODO: support checkpoint?
+        self._iter = 0
 
     def _init_pruner(self, pruner: Dict) -> None:
         """Build registered pruners and make preparations.
@@ -63,6 +65,8 @@ class ResRep(BaseAlgorithm):
         """
         if self.iter > self.before_update_mask_iter:
             self.pruner.update_mask(self.architecture)
+        # TODO
+        self._iter += 1
 
         optimizer.zero_grad()
         losses = self(**data)
@@ -78,8 +82,8 @@ class ResRep(BaseAlgorithm):
 
         return outputs
 
-    # TODO
-    # this may help: https://github.com/open-mmlab/mmcv/issues/1165
+    # TODO: get lr in models
+    # https://github.com/open-mmlab/mmcv/issues/1242
     @property
     def iter(self) -> int:
         """Current iterations.
@@ -87,4 +91,4 @@ class ResRep(BaseAlgorithm):
         Returns:
             int: [description]
         """
-        raise NotImplementedError
+        return self._iter

@@ -147,12 +147,19 @@ class ResRepPruner(StructurePruner):
         self._module2compactor = self._map_conv_compactor()
         self._compactor2modules = compactor2modules
 
-    # TODO
-    # pass single compactor instead of compactors
     @staticmethod
     def modify_conv_forward(module,
                             compactor: CompactorLayer) -> Callable[..., Any]:
-        """Modify the forward method of a conv layer."""
+        """Modify convolutional layer's forward method, add the operation of
+        compactor after convolution.
+
+        Args:
+            module ([type]): [description]
+            compactor (CompactorLayer): [description]
+
+        Returns:
+            Callable[..., Any]: [description]
+        """
 
         def modified_forward(self, feature: torch.Tensor) -> torch.Tensor:
             out = F.conv2d(feature, self.weight, self.bias, self.stride,
@@ -166,6 +173,13 @@ class ResRepPruner(StructurePruner):
     def add_pruning_attrs(self,
                           module: nn.Module,
                           is_modify_forward: bool = False) -> None:
+        """Override method in parent class, change default value of
+        `is_modify_forward` to False.
+
+        Args:
+            module (nn.Module): [description]
+            is_modify_forward (bool, optional): [description]
+        """
         return super().add_pruning_attrs(module, is_modify_forward)
 
     def update_mask(self, supernet: BaseArchitecture) -> None:
@@ -182,7 +196,7 @@ class ResRepPruner(StructurePruner):
 
     @torch.no_grad()
     def _calc_compactors_mask(self, supernet: BaseArchitecture) -> SUBNET_TYPE:
-        """Calculating mask for each compactor.
+        """Calculating mask for each compactor according to compactors' metric.
 
         Args:
             supernet (BaseArchitecture): [description]
@@ -236,6 +250,11 @@ class ResRepPruner(StructurePruner):
     # redundant function as in `AutoSlim`
     # put here or in algorithm/resrep.py?
     def _init_flops(self, supernet: BaseArchitecture) -> None:
+        """Add `__flops__` to each module in supernet.
+
+        Args:
+            supernet (BaseArchitecture): [description]
+        """
         flops_model = copy.deepcopy(supernet)
         flops_model.eval()
         if hasattr(flops_model, 'forward_dummy'):
@@ -245,7 +264,7 @@ class ResRepPruner(StructurePruner):
                 'FLOPs counter is currently not currently supported with {}'.
                 format(flops_model.__class__.__name__))
 
-        flops, params = get_model_complexity_info(
+        flops, _ = get_model_complexity_info(
             flops_model,
             self._input_shape,
             print_per_layer_stat=False,
@@ -301,7 +320,7 @@ class ResRepPruner(StructurePruner):
 
     def _get_deactivated_filter_nums(self,
                                      compactors_mask: SUBNET_TYPE) -> int:
-        """Calculate deactivated filter numbers of compactors.
+        """Calculate deactivated filter numbers of all compactors.
 
         Args:
             compactors_mask (SUBNET_TYPE): [description]
@@ -396,8 +415,6 @@ class ResRepPruner(StructurePruner):
         for module_name, compactor_name in \
                 self._module2compactor['out_mask'].items():
             module = self.name2module[module_name]
-            # TODO
-            # can mask of compactor and `in_mask`, `out_mask` linked?
             module.out_mask = \
                 subnet_dict[compactor_name].to(module.out_mask.device)
 
@@ -408,6 +425,12 @@ class ResRepPruner(StructurePruner):
                 subnet_dict[compactor_name].to(module.in_mask.device)
 
     def _map_conv_compactor(self) -> Dict[str, Dict[str, str]]:
+        """Map `in_mask` and `out_mask` of each convolutional layer to its
+        correspongding compactor.
+
+        Returns:
+            Dict[str, Dict[str, str]]: [description]
+        """
         module2compactor = dict()
 
         for module_name in self.modules_have_child:
@@ -446,4 +469,4 @@ class ResRepPruner(StructurePruner):
     # should load channel that has been set to 0
     def deploy_subnet(self, supernet: BaseArchitecture,
                       channel_cfg: Dict[Hashable, Any]) -> None:
-        super().deploy_subnet(supernet=supernet, channel_cfg=channel_cfg)
+        ...
