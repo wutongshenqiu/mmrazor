@@ -83,7 +83,7 @@ class ResRepPruner(StructurePruner):
             raise ValueError(
                 'One and only one of `flops_constraint` or `flops_ratio` '
                 'must be specified')
-        if flops_ratio <= 0 or flops_ratio > 1:
+        if flops_ratio is not None and (flops_ratio <= 0 or flops_ratio > 1):
             raise ValueError(
                 f'`flops_ratio` must between 0 and 1, but got `{flops_ratio}`')
         if least_channel_nums < 1:
