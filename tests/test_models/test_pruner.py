@@ -177,7 +177,7 @@ def _test_resrep_pruner_when_insert_compactor(pruner_cfg,
     assert torch.equal(pre_y, after_y)
 
     import os
-    if checkpoint_path is None and not os.path.exists(checkpoint_path):
+    if checkpoint_path is None or not os.path.exists(checkpoint_path):
         return
     architecture_cfg_ckpt = deepcopy(architecture_cfg)
     architecture_cfg_ckpt['model']['init_cfg'] = {
