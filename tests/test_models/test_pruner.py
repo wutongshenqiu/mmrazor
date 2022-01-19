@@ -145,6 +145,9 @@ def test_resrep_pruner() -> None:
     assert losses['loss'].item() > 0
 
     _test_resrep_pruner_init(pruner_cfg)
+    _test_resrep_pruner_when_insert_compactor(
+        pruner_cfg, architecture_cfg,
+        'checkpoint/resnet50_8xb32_in1k_20210831-ea4938fc.pth')
     _test_resrep_pruner_prepare_from_supernet(pruner_cfg, architecture_cfg)
     _test_resrep_pruner_modify_conv_forward(pruner_cfg, architecture_cfg)
     _test_resrep_pruner_update_mask(pruner_cfg, architecture_cfg)
@@ -161,12 +164,44 @@ def _test_resrep_pruner_init(pruner_cfg) -> None:
     assert hasattr(pruner, '_input_shape')
 
 
+def _test_resrep_pruner_when_insert_compactor(pruner_cfg,
+                                              architecture_cfg,
+                                              checkpoint_path=None) -> None:
+    pruner = PRUNERS.build(pruner_cfg)
+    architecture = ARCHITECTURES.build(architecture_cfg)
+
+    imgs = torch.rand(16, 3, 224, 224)
+    pre_y = architecture.forward_dummy(imgs)
+    pruner.prepare_from_supernet(architecture)
+    after_y = architecture.forward_dummy(imgs)
+    assert torch.equal(pre_y, after_y)
+
+    import os
+    if checkpoint_path is None and not os.path.exists(checkpoint_path):
+        return
+    architecture_cfg_ckpt = deepcopy(architecture_cfg)
+    architecture_cfg_ckpt['model']['init_cfg'] = {
+        'type': 'Pretrained',
+        'checkpoint': checkpoint_path
+    }
+    architecture = ARCHITECTURES.build(architecture_cfg_ckpt)
+    architecture.init_weights()
+    pre_y = architecture.forward_dummy(imgs)
+    pruner.prepare_from_supernet(architecture)
+    middle_y = architecture.forward_dummy(imgs)
+    architecture.init_weights()
+    after_y = architecture.forward_dummy(imgs)
+    assert torch.equal(pre_y, middle_y)
+    assert torch.equal(middle_y, after_y)
+
+
 def _test_resrep_pruner_prepare_from_supernet(pruner_cfg,
                                               architecture_cfg) -> None:
     pruner = PRUNERS.build(pruner_cfg)
     architecture = ARCHITECTURES.build(architecture_cfg)
 
     pruner.prepare_from_supernet(architecture)
+
     # test _init_flops
     for _, module in architecture.named_modules():
         assert getattr(module, '__flops__') >= 0

@@ -32,8 +32,17 @@ algorithm = dict(
         begin_granularity=4,
         lasso_strength=1e-4,
         input_shape=(3, 224, 224)),
-    before_update_mask_iter=10000)
+    before_update_mask_iter=10000,
+    mask_interval=200)
 
-runner = dict(type='EpochBasedRunner', max_epochs=50)
+lr_config = dict(_delete_=True, policy='CosineAnnealing', min_lr=0)
+
+runner = dict(type='EpochBasedRunner', max_epochs=180)
+
+optimizer = dict(type='SGD', momentum=0.9, weight_decay=1e-4)
+optimizer_config = None
+
+evaluation = dict(
+    interval=1, metric='accuracy', metric_options={'topk': (1, 5)})
 
 use_ddp_wrapper = True

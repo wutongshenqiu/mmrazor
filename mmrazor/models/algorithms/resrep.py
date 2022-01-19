@@ -13,10 +13,12 @@ from .base import BaseAlgorithm
 class ResRep(BaseAlgorithm):
     # TODO: update docs
 
-    def __init__(self, before_update_mask_iter: int, **kwargs) -> None:
+    def __init__(self, before_update_mask_iter: int, mask_interval: int,
+                 **kwargs) -> None:
         super(ResRep, self).__init__(**kwargs)
 
         self._before_update_mask_iter = before_update_mask_iter
+        self._mask_interval = mask_interval
         # TODO: use hook
         self.register_buffer('_current_iter', torch.LongTensor([0]))
 
@@ -64,15 +66,16 @@ class ResRep(BaseAlgorithm):
                 accumulate gradient
         """
         self._update_iter(count=1)
-        if self.iter > self._before_update_mask_iter:
-            self.pruner.update_mask(self.architecture)
+        if self.iter > self._before_update_mask_iter \
+                and self.iter % self._mask_interval == 0:
+            self.pruner.module.update_mask(self.architecture.module)
 
         optimizer.zero_grad()
         losses = self(**data)
         loss, log_vars = self._parse_losses(losses)
         loss.backward()
 
-        self.pruner.gradient_reset()
+        self.pruner.module.gradient_reset()
 
         optimizer.step()
 
