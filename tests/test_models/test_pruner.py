@@ -286,6 +286,7 @@ def _test_resrep_pruner_update_mask(pruner_cfg, architecture_cfg) -> None:
     compactor_name = random.choice(list(pruner._compactors.keys()))
     compactor = pruner._compactors[compactor_name]
 
+    # test get metric list
     with torch.no_grad():
         compactor._layer.weight[0, :, :, :] += 9999.
         compactor._layer.weight[1, :, :, :] += 999.
@@ -299,6 +300,7 @@ def _test_resrep_pruner_update_mask(pruner_cfg, architecture_cfg) -> None:
             assert abs(metric_dict[(compactor_name, i)] -
                        metric_list[i]) < 1e-8
 
+    # test sample_subnet and set_subnet
     with torch.no_grad():
         for i in range(pruner._begin_granularity + 10):
             compactor._layer.weight[i, :, :, :] = 0.
@@ -337,3 +339,17 @@ def _test_resrep_pruner_update_mask(pruner_cfg, architecture_cfg) -> None:
             else:
                 assert pruner._get_mask_deactivated_filter_nums(
                     module.in_mask) == 0
+
+    # test least_channel_nums
+    pruner_cfg_lcn = deepcopy(pruner_cfg)
+    least_channel_nums = random.randint(1, 10)
+    pruner_cfg_lcn['least_channel_nums'] = least_channel_nums
+    pruner_cfg_lcn['begin_granularity'] = 10000
+    pruner = PRUNERS.build(pruner_cfg_lcn)
+    architecture = ARCHITECTURES.build(architecture_cfg)
+    pruner.prepare_from_supernet(architecture)
+    pruner.update_mask(architecture)
+
+    for compactor in pruner._compactors.values():
+        assert pruner._get_mask_activated_filter_nums(compactor.mask) >= \
+            least_channel_nums

@@ -230,7 +230,7 @@ class ResRepPruner(StructurePruner):
             compactor_name, filter_id = sorted_metric_keys[
                 cur_deactivated_nums]
             compactor_mask = next_compactors_mask[compactor_name]
-            if self._get_mask_activated_filter_nums(compactor_mask) < \
+            if self._get_mask_activated_filter_nums(compactor_mask) <= \
                     self._least_channel_nums:
                 continue
             self._set_deactivated_filter(compactor_mask, filter_id)
