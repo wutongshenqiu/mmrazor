@@ -1,6 +1,5 @@
 _base_ = [
     '../../_base_/datasets/mmcls/imagenet_bs32.py',
-    '../../_base_/schedules/mmcls/imagenet_bs256.py',
     '../../_base_/mmcls_runtime.py'
 ]
 
@@ -28,21 +27,50 @@ algorithm = dict(
     distiller=None,
     pruner=dict(
         type='ResRepPruner',
-        flops_ratio=0.6,
+        flops_ratio=0.455,
         begin_granularity=4,
+        ignore_skip_mask=False,
         lasso_strength=1e-4,
-        input_shape=(3, 224, 224)),
-    before_update_mask_iter=10000,
+        input_shape=(3, 224, 224),
+        follow_paper=True),
+    before_update_mask_iter=25022,
     mask_interval=200)
 
-lr_config = dict(_delete_=True, policy='CosineAnnealing', min_lr=0)
+# TODO
+# same as pytorch?
+lr_config = dict(policy='CosineAnnealing', min_lr=0, by_epoch=False)
 
 runner = dict(type='EpochBasedRunner', max_epochs=180)
 
-optimizer = dict(type='SGD', momentum=0.9, weight_decay=1e-4)
+# TODO
+# compactor has different momentum
+optimizer = dict(
+    architecture=dict(
+        type='SGD',
+        lr=0.01,
+        momentum=0.9,
+        weight_decay=1e-4,
+        paramwise_cfg=dict(
+            bias_lr_mult=2., bias_decay_mult=0., norm_decay_mult=0.)),
+    pruner=dict(
+        type='SGD',
+        lr=0.01,
+        momentum=0.99,
+        weight_decay=0.,
+        paramwise_cfg=dict(
+            bias_lr_mult=2., bias_decay_mult=0., norm_decay_mult=0.)),
+)
 optimizer_config = None
 
 evaluation = dict(
-    interval=1, metric='accuracy', metric_options={'topk': (1, 5)})
+    interval=1, metric='accuracy', metric_options={'topk': (1, 5)}, start=1)
+
+workflow = [('train', 1)]
+
+checkpoint_config = dict(interval=1, max_keep_ckpts=10)
 
 use_ddp_wrapper = True
+
+log_level = 'DEBUG'
+
+data = dict(samples_per_gpu=32)
