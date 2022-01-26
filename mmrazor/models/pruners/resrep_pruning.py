@@ -16,8 +16,11 @@ from .types import METRIC_DICT_TYPE, SUBNET_TYPE
 
 
 def _print_debug_msg(*args, rank_idx: int = 0, **kwargs) -> None:
-    if torch.distributed.get_rank() == rank_idx:
-        print(f'rank {rank_idx}', end=', ')
+    try:
+        if torch.distributed.get_rank() == rank_idx:
+            print(f'rank {rank_idx}', end=', ')
+            print(*args, **kwargs)
+    except RuntimeError:
         print(*args, **kwargs)
 
 
