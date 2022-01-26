@@ -15,6 +15,12 @@ from .structure_pruning import StructurePruner
 from .types import METRIC_DICT_TYPE, SUBNET_TYPE
 
 
+def _print_debug_msg(*args, rank_idx: int = 0, **kwargs) -> None:
+    if torch.distributed.get_rank() == rank_idx:
+        print(f'rank {rank_idx}', end=', ')
+        print(*args, **kwargs)
+
+
 class CompactorLayer(nn.Module):
     # TODO: update docs
 
@@ -51,7 +57,8 @@ class CompactorLayer(nn.Module):
 
     @torch.no_grad()
     def add_lasso_grad(self, lasso_strength: float) -> None:
-        self._layer.weight.grad.add_(self.lasso_grad(lasso_strength))
+        lasso_grad = self.lasso_grad(lasso_strength)
+        self._layer.weight.grad.add_(lasso_grad)
 
     @torch.no_grad()
     def get_metric_list(self) -> List[float]:
@@ -74,9 +81,11 @@ class ResRepPruner(StructurePruner):
                  flops_constraint: Optional[float] = None,
                  flops_ratio: Optional[float] = None,
                  begin_granularity: int = 4,
+                 ignore_skip_mask: bool = True,
                  least_channel_nums: int = 1,
                  lasso_strength: float = 1e-4,
                  input_shape: Iterable[int] = (3, 224, 224),
+                 follow_paper: bool = False,
                  **kwargs: Any) -> None:
         if (flops_constraint is None and flops_ratio is None) or \
                 (flops_constraint is not None and flops_ratio is not None):
@@ -101,9 +110,13 @@ class ResRepPruner(StructurePruner):
         self._flops_constraint = flops_constraint
         self._flops_ratio = flops_ratio
         self._begin_granularity = begin_granularity
+        self._ignore_skip_mask = ignore_skip_mask
+        if not ignore_skip_mask:
+            self._pre_deactivated_nums = 0
         self._least_channel_nums = least_channel_nums
         self._lasso_strength = lasso_strength
         self._input_shape = input_shape
+        self._follow_paper = follow_paper
 
     # TODO
     # should other layer except compactor has mask?
@@ -121,16 +134,22 @@ class ResRepPruner(StructurePruner):
         compactor2modules: Dict[str, List[str]] = dict()
         compactors = nn.ModuleDict()
         for name, out_mask in self.channel_spaces.items():
+            if name in group2modules:
+                modules_name = group2modules[name]
+            else:
+                modules_name = [name]
+            if self._follow_paper:
+                if len(modules_name) != 1:
+                    continue
+                # HACK: very ugly hack
+                if name == 'backbone.conv1':
+                    continue
+
             out_channels = out_mask.size(1)
             # nn.ModuleDict's key should not contain '.'
             compactor_name = name.replace('.', '_')
             compactors[compactor_name] = CompactorLayer(
                 feature_nums=out_channels, name=compactor_name)
-
-            if name in group2modules:
-                modules_name = group2modules[name]
-            else:
-                modules_name = [name]
 
             for module_name in modules_name:
                 module = self.name2module[module_name]
@@ -146,6 +165,13 @@ class ResRepPruner(StructurePruner):
         self._compactors: Dict[Hashable, CompactorLayer] = compactors
         self._module2compactor = self._map_conv_compactor()
         self._compactor2modules = compactor2modules
+
+        compactor2modules_msg = f'total compactors: {len(compactor2modules)}\n'
+        compactor2modules_msg += '\n'.join(
+            (f'compactor name: {cn}, mask shape: {c.mask.shape}, '
+             f'corresponding modules: {compactor2modules[cn]}'
+             for cn, c in compactors.items()))
+        _print_debug_msg(compactor2modules_msg)
 
     @staticmethod
     def modify_conv_forward(module,
@@ -214,17 +240,26 @@ class ResRepPruner(StructurePruner):
         cur_flops = self._calc_subnet_flops(
             supernet=supernet, compactors_mask=cur_compactors_mask)
         if cur_flops > self._flops_constraint:
-            next_deactivated_nums = self._get_deactivated_filter_nums(
-                compactors_mask=cur_compactors_mask) + self._begin_granularity
+            if self._ignore_skip_mask:
+                next_deactivated_nums = self._get_deactivated_filter_nums(
+                    compactors_mask=cur_compactors_mask) + \
+                    self._begin_granularity
+            else:
+                next_deactivated_nums = self._pre_deactivated_nums + \
+                    self._begin_granularity
+                self._pre_deactivated_nums = next_deactivated_nums
         else:
             next_deactivated_nums = float('inf')
         assert next_deactivated_nums > 0
+        _print_debug_msg(
+            f'next total deactivated numbers: {next_deactivated_nums}')
 
         next_compactors_mask = {
             k: torch.ones_like(v.mask)
             for k, v in self._compactors.items()
         }
         cur_deactivated_nums = 0
+        skip_deactivated_nums = 0
         while True:
             cur_deactivated_nums += 1
             compactor_name, filter_id = sorted_metric_keys[
@@ -232,6 +267,7 @@ class ResRepPruner(StructurePruner):
             compactor_mask = next_compactors_mask[compactor_name]
             if self._get_mask_activated_filter_nums(compactor_mask) <= \
                     self._least_channel_nums:
+                skip_deactivated_nums += 1
                 continue
             self._set_deactivated_filter(compactor_mask, filter_id)
 
@@ -243,6 +279,16 @@ class ResRepPruner(StructurePruner):
             if cur_deactivated_nums >= next_deactivated_nums:
                 break
 
+        _print_debug_msg(f'skip deactivated numbers: {skip_deactivated_nums}')
+        _print_debug_msg(
+            f'current FLOPs rate: {cur_flops / self._original_flops}')
+        compactor_mask_info = '\n'.join(
+            (f'{k}, deactivated numbers: '
+             f'{self._get_mask_deactivated_filter_nums(v)}, '
+             f'activated numbers: {self._get_mask_activated_filter_nums(v)}, '
+             f'total numbers: {v.shape[1]}'
+             for k, v in next_compactors_mask.items()))
+        _print_debug_msg(compactor_mask_info)
         return next_compactors_mask
 
     # TODO
@@ -469,3 +515,8 @@ class ResRepPruner(StructurePruner):
     def deploy_subnet(self, supernet: BaseArchitecture,
                       channel_cfg: Dict[Hashable, Any]) -> None:
         ...
+
+    # TODO: ugly hack
+    # DDP bug
+    def forward(self, architecture: BaseArchitecture, data: Dict) -> Dict:
+        return architecture(**data)

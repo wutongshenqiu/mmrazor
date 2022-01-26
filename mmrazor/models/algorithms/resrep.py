@@ -66,18 +66,21 @@ class ResRep(BaseAlgorithm):
                 accumulate gradient
         """
         self._update_iter(count=1)
-        if self.iter > self._before_update_mask_iter \
-                and self.iter % self._mask_interval == 0:
+        total_compactor_iter = self.iter - self._before_update_mask_iter
+        if total_compactor_iter > 0 \
+                and total_compactor_iter % self._mask_interval == 0:
             self.pruner.module.update_mask(self.architecture.module)
 
-        optimizer.zero_grad()
-        losses = self(**data)
+        for _, opt in optimizer.items():
+            opt.zero_grad()
+        losses = self.pruner(self.architecture, data)
         loss, log_vars = self._parse_losses(losses)
         loss.backward()
 
         self.pruner.module.gradient_reset()
 
-        optimizer.step()
+        for _, opt in optimizer.items():
+            opt.step()
 
         outputs = dict(
             loss=loss, log_vars=log_vars, num_samples=len(data['img'].data))
