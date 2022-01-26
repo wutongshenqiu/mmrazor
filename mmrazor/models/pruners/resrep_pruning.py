@@ -169,6 +169,7 @@ class ResRepPruner(StructurePruner):
         self._module2compactor = self._map_conv_compactor()
         self._compactor2modules = compactor2modules
 
+        _print_debug_msg(f'module to compactors: {self._module2compactor}')
         compactor2modules_msg = f'total compactors: {len(compactor2modules)}\n'
         compactor2modules_msg += '\n'.join(
             (f'compactor name: {cn}, mask shape: {c.mask.shape}, '
