@@ -53,6 +53,10 @@ class ResRep(BaseAlgorithm):
                                       ' appreciate it if you create a issue.')
 
         self.pruner: ResRepPruner = build_pruner(pruner)
+        # BUG
+        # train mode will affect batch normalization layers
+        self.pruner.eval()
+        self.architecture.eval()
         self.pruner.prepare_from_supernet(self.architecture)
 
     def train_step(self, data: Dict, optimizer: torch.optim.Optimizer) -> Dict:
