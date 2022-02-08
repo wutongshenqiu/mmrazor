@@ -114,6 +114,9 @@ venv.bak/
 /work_dirs
 /mmrazor/.mim
 
+# checkpoint
+checkpoint/
+
 # Pytorch
 *.pth
 
