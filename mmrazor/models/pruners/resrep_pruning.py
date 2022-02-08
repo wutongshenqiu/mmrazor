@@ -134,6 +134,9 @@ class ResRepPruner(StructurePruner):
             except KeyError:
                 group2modules[group] = [module_name]
 
+        # HACK: just for verify correction
+        self._conv_bn_links = {v: k for k, v in self.bn_conv_links.items()}
+
         compactor2modules: Dict[str, List[str]] = dict()
         compactors = nn.ModuleDict()
         for name, out_mask in self.channel_spaces.items():
@@ -155,16 +158,32 @@ class ResRepPruner(StructurePruner):
                 feature_nums=out_channels, name=compactor_name)
 
             for module_name in modules_name:
+                if module_name not in self._conv_bn_links:
+                    _print_debug_msg(
+                        f'{module_name} does not have a bn layer follow, skip!'
+                    )
+                    continue
                 module = self.name2module[module_name]
-                module.__compactor_name__ = compactor_name
                 if type(module).__name__ == 'Conv2d' and module.groups == 1:
-                    module.forward = self.modify_conv_forward(
-                        module=module, compactor=compactors[compactor_name])
+                    module.__compactor_name__ = compactor_name
+                    follow_bn_name = self._conv_bn_links[module_name]
+                    follow_bn_module = self.name2module[follow_bn_name]
+                    follow_bn_module.__original_forward = \
+                        follow_bn_module.forward
+                    follow_bn_module.forward = self.modify_bn_forward(
+                        module=follow_bn_module,
+                        compactor=compactors[compactor_name])
+                    _print_debug_msg(
+                        f'modify {follow_bn_name} with compactor: '
+                        f'{compactor_name}')
+                    # original code
+                    # module.__compactor_name__ = compactor_name
+                    # module.forward = self.modify_conv_forward(
+                    #     module=module, compactor=compactors[compactor_name])
                 try:
                     compactor2modules[compactor_name].append(module_name)
                 except KeyError:
                     compactor2modules[compactor_name] = [module_name]
-
         self._compactors: Dict[Hashable, CompactorLayer] = compactors
         self._module2compactor = self._map_conv_compactor()
         self._compactor2modules = compactor2modules
@@ -176,6 +195,28 @@ class ResRepPruner(StructurePruner):
              f'corresponding modules: {compactor2modules[cn]}'
              for cn, c in compactors.items()))
         _print_debug_msg(compactor2modules_msg)
+
+    @staticmethod
+    def modify_bn_forward(module,
+                          compactor: CompactorLayer) -> Callable[..., Any]:
+        """Modify bn layer's forward method, add the operation of compactor
+        after convolution.
+
+        Args:
+            module ([type]): [description]
+            compactor (CompactorLayer): [description]
+
+        Returns:
+            Callable[..., Any]: [description]
+        """
+
+        def modified_forward(self, input: torch.Tensor) -> torch.Tensor:
+            out = self.__original_forward(input)
+            out = compactor(out)
+
+            return out
+
+        return MethodType(modified_forward, module)
 
     @staticmethod
     def modify_conv_forward(module,

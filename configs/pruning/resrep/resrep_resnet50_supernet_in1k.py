@@ -29,7 +29,7 @@ algorithm = dict(
         type='ResRepPruner',
         flops_ratio=0.455,
         begin_granularity=4,
-        ignore_skip_mask=False,
+        ignore_skip_mask=True,
         lasso_strength=1e-4,
         input_shape=(3, 224, 224),
         follow_paper=True),
@@ -63,11 +63,11 @@ optimizer = dict(
 optimizer_config = None
 
 evaluation = dict(
-    interval=1, metric='accuracy', metric_options={'topk': (1, 5)}, start=1)
+    interval=2, metric='accuracy', metric_options={'topk': (1, 5)}, start=1)
 
 workflow = [('train', 1)]
 
-checkpoint_config = dict(interval=1, max_keep_ckpts=10)
+checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 
 use_ddp_wrapper = True
 
