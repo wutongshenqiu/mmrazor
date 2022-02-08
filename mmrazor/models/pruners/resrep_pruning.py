@@ -459,7 +459,7 @@ class ResRepPruner(StructurePruner):
         Returns:
             int: [description]
         """
-        compactor_mask[:, filter_id, :, :] = 0.0
+        compactor_mask[filter_id, :, :, :] = 0.0
 
     def _get_metric_dict(self) -> METRIC_DICT_TYPE:
         """Calculate metric for every output channel of each compactor.
