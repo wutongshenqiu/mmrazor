@@ -40,9 +40,11 @@ class CompactorLayer(nn.Module):
             self._layer.weight.data.copy_(
                 torch.eye(feature_nums).reshape(self._layer.weight.shape))
 
+        # TODO
+        # will this affect other algorithms?
         self.register_buffer(
             name='mask',
-            tensor=self._layer.weight.new_ones((1, feature_nums, 1, 1)))
+            tensor=self._layer.weight.new_ones((feature_nums, 1, 1, 1)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self._layer(x)
@@ -61,7 +63,7 @@ class CompactorLayer(nn.Module):
     @torch.no_grad()
     def add_lasso_grad(self, lasso_strength: float) -> None:
         lasso_grad = self.lasso_grad(lasso_strength)
-        self._layer.weight.grad.add_(lasso_grad)
+        self._layer.weight.grad.data.add_(lasso_grad)
 
     @torch.no_grad()
     def get_metric_list(self) -> List[float]:
