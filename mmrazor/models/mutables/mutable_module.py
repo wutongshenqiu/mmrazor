@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from abc import ABCMeta, abstractmethod
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -18,13 +19,17 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
         init_cfg (dict): Init config for ``BaseModule``.
     """
 
-    def __init__(self, space_id, num_chosen=1, init_cfg=None, **kwargs):
+    def __init__(self,
+                 space_id: str,
+                 num_chosen: int = 1,
+                 init_cfg: Optional[Dict] = None,
+                 **kwargs) -> None:
         super(MutableModule, self).__init__(init_cfg)
         self.space_id = space_id
         self.num_chosen = num_chosen
 
     @abstractmethod
-    def forward(self, x):
+    def forward(self, x: Union[torch.Tensor, Tuple[torch.Tensor]]) -> Any:
         """Forward computation.
 
         Args:
@@ -34,7 +39,7 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def build_choices(self, cfg):
+    def build_choices(self, cfg: Dict) -> None:
         """Build all chosen ``OPS`` used to combine ``MUTABLES``, and the
         choices will be sampled.
 
@@ -43,7 +48,7 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
         """
         pass
 
-    def build_choice_mask(self):
+    def build_choice_mask(self) -> torch.Tensor:
         """Generate the choice mask for the choices of ``MUTABLES``.
 
         Returns:
@@ -54,18 +59,22 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
         else:
             return torch.ones(self.num_choices).bool()
 
-    def set_choice_mask(self, mask):
+    def set_choice_mask(self, mask: torch.Tensor) -> None:
         """Use the mask to update the choice mask.
 
         Args:
             mask (torch.Tensor): Choice mask specified to update the choice
                 mask.
         """
-        assert self.choice_mask.size(0) == mask.size(0)
-        self.choice_mask = mask
+        # TODO
+        # size(0) to shape?
+        assert self.choice_mask.shape == mask.shape
+        self.choice_mask = mask, 'Newer mask should have the same shape ' \
+            f'as original, but got newer: {mask.shape}, ' \
+            f'original: {self.choice_mask.shape}'
 
     @property
-    def num_choices(self):
+    def num_choices(self) -> int:
         """The number of the choices.
 
         Returns:
@@ -74,7 +83,7 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
         return len(self.choices)
 
     @property
-    def choice_names(self):
+    def choice_names(self) -> Tuple[str]:
         """The choices' names.
 
         Returns:
@@ -85,7 +94,7 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
         return tuple(self.choices.keys())
 
     @property
-    def choice_modules(self):
+    def choice_modules(self) -> Tuple[nn.Module]:
         """The choices' modules.
 
         Returns:
@@ -95,7 +104,7 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
             'candidates must be nn.ModuleDict.'
         return tuple(self.choices.values())
 
-    def build_space_mask(self):
+    def build_space_mask(self) -> torch.Tensor:
         """Generate the space mask for the search spaces of ``MUTATORS``.
 
         Returns:
@@ -106,7 +115,9 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
         else:
             return torch.ones(self.num_choices) * 1.0
 
-    def export(self, chosen):
+    # TODO
+    # set maybe better than list when using `in` operation
+    def export(self, chosen: List[str]) -> None:
         """Delete not chosen ``OPS`` in the choices.
 
         Args:

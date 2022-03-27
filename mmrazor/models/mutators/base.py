@@ -1,7 +1,9 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from abc import ABCMeta
+from typing import Dict
 
 from mmcv.runner import BaseModule
+from torch.nn import Module
 
 from mmrazor.models.architectures import Placeholder
 from mmrazor.models.builder import MUTABLES, MUTATORS
@@ -12,11 +14,11 @@ from mmrazor.models.mutables import MutableModule
 class BaseMutator(BaseModule, metaclass=ABCMeta):
     """Base class for mutators."""
 
-    def __init__(self, placeholder_mapping=None, init_cfg=None):
+    def __init__(self, placeholder_mapping=None, init_cfg=None) -> None:
         super(BaseMutator, self).__init__(init_cfg=init_cfg)
         self.placeholder_mapping = placeholder_mapping
 
-    def prepare_from_supernet(self, supernet):
+    def prepare_from_supernet(self, supernet: Module) -> None:
         """Implement some preparatory work based on supernet, including
         ``convert_placeholder`` and ``build_search_spaces``.
 
@@ -29,7 +31,7 @@ class BaseMutator(BaseModule, metaclass=ABCMeta):
 
         self.search_spaces = self.build_search_spaces(supernet)
 
-    def build_search_spaces(self, supernet):
+    def build_search_spaces(self, supernet: Module) -> Dict[str, Dict]:
         """Build a search space from the supernet.
 
         Args:
@@ -42,7 +44,7 @@ class BaseMutator(BaseModule, metaclass=ABCMeta):
         """
         search_spaces = dict()
 
-        def traverse(module):
+        def traverse(module: Module) -> None:
             for child in module.children():
                 if isinstance(child, MutableModule):
                     if child.space_id not in search_spaces.keys():
@@ -59,7 +61,8 @@ class BaseMutator(BaseModule, metaclass=ABCMeta):
         traverse(supernet)
         return search_spaces
 
-    def convert_placeholder(self, supernet, placeholder_mapping):
+    def convert_placeholder(self, supernet: Module,
+                            placeholder_mapping: Dict) -> None:
         """Replace all placeholders in the model.
 
         Args:
@@ -72,7 +75,7 @@ class BaseMutator(BaseModule, metaclass=ABCMeta):
                 its values are the registered ``OPS``.
         """
 
-        def traverse(module):
+        def traverse(module: Module) -> None:
 
             for name, child in module.named_children():
                 if isinstance(child, Placeholder):
@@ -98,7 +101,8 @@ class BaseMutator(BaseModule, metaclass=ABCMeta):
 
         traverse(supernet)
 
-    def deploy_subnet(self, supernet, subnet_dict):
+    def deploy_subnet(self, supernet: Module, subnet_dict: Dict[str,
+                                                                Dict]) -> None:
         """Export the subnet from the supernet based on the specified
         subnet_dict.
 
@@ -113,7 +117,7 @@ class BaseMutator(BaseModule, metaclass=ABCMeta):
                 'chosen name2', ...]}
         """
 
-        def traverse(module):
+        def traverse(module: Module) -> None:
             for name, child in module.named_children():
                 if isinstance(child, MutableModule):
                     space_id = child.space_id
