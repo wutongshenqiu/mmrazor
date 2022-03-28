@@ -389,7 +389,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
 
     def add_pruning_attrs(self, module):
         """Add masks to a ``nn.Module``."""
-        if type(module).__name__ == 'Conv2d':
+        if isinstance(module, nn.Conv2d):
             module.register_buffer(
                 'in_mask',
                 module.weight.new_ones((1, module.in_channels, 1, 1), ))

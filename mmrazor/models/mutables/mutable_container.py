@@ -1,15 +1,15 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import random
 from typing import Dict, List, Tuple
 
 import torch
 
 from ..builder import MUTABLES
+from .mixins import OrderedChoiceMixin
 from .mutable_module import MutableModule
 
 
 @MUTABLES.register_module()
-class MutableSequential(MutableModule):
+class MutableSequential(MutableModule, OrderedChoiceMixin):
 
     def __init__(self, length_list: List[int], choices: torch.nn.Sequential,
                  **kwargs) -> None:
@@ -53,28 +53,3 @@ class MutableSequential(MutableModule):
               f'max length: {self._length_list[-1]}')
 
         return self.choices[:self._length_list[choice_idx]](x)
-
-    @property
-    def min_choice_mask(self) -> torch.Tensor:
-        """Choice mask with minimum squential length."""
-        choice_mask = torch.zeros_like(self.choice_mask)
-        choice_mask[0] = 1
-
-        return choice_mask
-
-    @property
-    def max_choice_mask(self) -> torch.Tensor:
-        """Choice mask with maximum squential length."""
-        choice_mask = torch.zeros_like(self.choice_mask)
-        choice_mask[-1] = 1
-
-        return choice_mask
-
-    @property
-    def random_choice_mask(self) -> torch.Tensor:
-        """Choice mask with random sequential length in length list."""
-        choice_mask = torch.zeros_like(self.choice_mask)
-        choice_idx = random.randint(0, len(self._length_list) - 1)
-        choice_mask[choice_idx] = 1
-
-        return choice_mask

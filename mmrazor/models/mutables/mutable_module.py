@@ -68,10 +68,11 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
         """
         # TODO
         # size(0) to shape?
-        assert self.choice_mask.shape == mask.shape
-        self.choice_mask = mask, 'Newer mask should have the same shape ' \
+        assert self.choice_mask.shape == mask.shape, \
+            'Newer mask should have the same shape ' \
             f'as original, but got newer: {mask.shape}, ' \
             f'original: {self.choice_mask.shape}'
+        self.choice_mask = mask
 
     @property
     def num_choices(self) -> int:

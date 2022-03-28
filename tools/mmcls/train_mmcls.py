@@ -164,6 +164,27 @@ def main():
     # Difference from mmclassification
     # replace `model` to `algorithm`
     algorithm = build_algorithm(cfg.algorithm)
+    algorithm.eval()
+    import pdb
+    pdb.set_trace()
+
+    # pruner = algorithm.pruner
+    # print(pruner.channel_spaces)
+    def print_choice_mask(search_spaces: dict[str, dict]) -> None:
+        print('=' * 100)
+        for space_id, space_info in search_spaces.items():
+            modules = space_info['modules']
+            choice_mask = modules[0].choice_mask
+            print(f'space id: {space_id}, choice mask: {choice_mask}')
+
+    mutator = algorithm.mutator
+    print_choice_mask(mutator.search_spaces)
+    mutator.set_max_subnet()
+    print_choice_mask(mutator.search_spaces)
+    mutator.set_min_subnet()
+    print_choice_mask(mutator.search_spaces)
+    mutator.set_random_subnet()
+    print_choice_mask(mutator.search_spaces)
     algorithm.init_weights()
 
     datasets = [build_dataset(cfg.data.train)]

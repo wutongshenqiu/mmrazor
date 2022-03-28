@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
-import random
 from typing import Any, Dict, List, Tuple
 
 import torch
@@ -9,11 +8,12 @@ import torch.nn.functional as F
 
 from mmrazor.models.ops.base import CHOICE_TYPE, BaseDynamicOP
 from ..builder import MUTABLES, build_op
+from .mixins import OrderedChoiceMixin
 from .mutable_module import MutableModule
 
 
 @MUTABLES.register_module()
-class DynamicOP(MutableModule):
+class DynamicOP(MutableModule, OrderedChoiceMixin):
 
     def __init__(self, choices: List[CHOICE_TYPE], dynamic_cfg: Dict,
                  choice_args: Dict, **kwargs: Any) -> None:
@@ -30,7 +30,7 @@ class DynamicOP(MutableModule):
         self._dynamic_op = op
 
         self.choice_mask = self.build_choice_mask()
-        self.choice_mask = self.min_choice_mask
+        self.choice_mask = self.max_choice_mask
 
     def build_choices(self, cfg: Dict) -> None:
         pass
@@ -48,31 +48,6 @@ class DynamicOP(MutableModule):
         self._dynamic_op.set_choice(choice)
 
         return self._dynamic_op(x)
-
-    @property
-    def min_choice_mask(self) -> torch.Tensor:
-        """Choice mask with minimum squential length."""
-        choice_mask = torch.zeros_like(self.choice_mask)
-        choice_mask[0] = 1
-
-        return choice_mask
-
-    @property
-    def max_choice_mask(self) -> torch.Tensor:
-        """Choice mask with maximum squential length."""
-        choice_mask = torch.zeros_like(self.choice_mask)
-        choice_mask[-1] = 1
-
-        return choice_mask
-
-    @property
-    def random_choice_mask(self) -> torch.Tensor:
-        """Choice mask with random sequential length in length list."""
-        choice_mask = torch.zeros_like(self.choice_mask)
-        choice_idx = random.randint(0, len(self.choices) - 1)
-        choice_mask[choice_idx] = 1
-
-        return choice_mask
 
 
 class MutableOP(MutableModule):
