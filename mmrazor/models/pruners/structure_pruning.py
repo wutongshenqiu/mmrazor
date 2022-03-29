@@ -366,11 +366,11 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
     @staticmethod
     def modify_conv_forward(module):
         """Modify the forward method of a conv layer."""
+        original_forward = module.forward
 
         def modified_forward(self, feature):
             feature = feature * self.in_mask
-            return F.conv2d(feature, self.weight, self.bias, self.stride,
-                            self.padding, self.dilation, self.groups)
+            return original_forward(feature)
 
         return MethodType(modified_forward, module)
 

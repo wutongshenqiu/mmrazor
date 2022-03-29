@@ -71,8 +71,6 @@ class AutoSlim(BaseAlgorithm):
             pseudo_pruner.set_subnet(subnet_dict)
             subnet_dict = pseudo_pruner.export_subnet()
 
-            import pprint
-            pprint(subnet_dict)
             pseudo_pruner.deploy_subnet(pseudo_architecture, subnet_dict)
             pseudo_img = torch.randn(1, 3, 224, 224)
             pseudo_architecture.forward_dummy(pseudo_img)

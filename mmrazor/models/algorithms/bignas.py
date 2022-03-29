@@ -21,9 +21,8 @@ class BigNAS(AutoSlim):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
-        # TODO
-        # assert self.pruner is not None, \
-        #     "Pruner must be configured for BigNAS!"
+        assert self.pruner is not None, \
+            'Pruner must be configured for BigNAS!'
         assert self.distiller is not None, \
             'Distiller must be configured for BigNAS!'
         assert self.mutator is not None, \

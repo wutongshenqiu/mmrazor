@@ -165,8 +165,6 @@ def main():
     # replace `model` to `algorithm`
     algorithm = build_algorithm(cfg.algorithm)
     algorithm.eval()
-    import pdb
-    pdb.set_trace()
 
     # pruner = algorithm.pruner
     # print(pruner.channel_spaces)
@@ -177,15 +175,20 @@ def main():
             choice_mask = modules[0].choice_mask
             print(f'space id: {space_id}, choice mask: {choice_mask}')
 
-    mutator = algorithm.mutator
-    print_choice_mask(mutator.search_spaces)
-    mutator.set_max_subnet()
-    print_choice_mask(mutator.search_spaces)
-    mutator.set_min_subnet()
-    print_choice_mask(mutator.search_spaces)
-    mutator.set_random_subnet()
-    print_choice_mask(mutator.search_spaces)
+    # mutator = algorithm.mutator
+    # print_choice_mask(mutator.search_spaces)
+    # mutator.set_max_subnet()
+    # print_choice_mask(mutator.search_spaces)
+    # mutator.set_min_subnet()
+    # print_choice_mask(mutator.search_spaces)
+    # mutator.set_random_subnet()
+    # print_choice_mask(mutator.search_spaces)
     algorithm.init_weights()
+    import pdb
+    pdb.set_trace()
+
+    pseudo_img = torch.randn(1, 3, 224, 224)
+    algorithm.architecture.forward_dummy(pseudo_img)
 
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
