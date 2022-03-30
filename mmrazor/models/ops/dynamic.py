@@ -97,7 +97,7 @@ class DynamicConv2d(BaseDynamicOP[int], Conv2d):
         if self.current_choice == self._max_kernel_size:
             return self.weight
 
-        weight = self.weight[:, :, :, :]
+        current_weight = self.weight[:, :, :, :]
         for i in range(len(self._choices) - 1, 0, -1):
             source_kernel_size = self._choices[i]
             if source_kernel_size <= self.current_choice:
@@ -114,13 +114,15 @@ class DynamicConv2d(BaseDynamicOP[int], Conv2d):
             start_offset, end_offset = self._get_current_kernel_pos(
                 source_kernel_size=source_kernel_size,
                 target_kernel_size=target_kernel_size)
-            weight = self.weight[:, :, start_offset:end_offset,
-                                 start_offset:end_offset]
+            weight = current_weight[:, :, start_offset:end_offset,
+                                    start_offset:end_offset]
             weight = weight.reshape(-1, target_kernel_size**2)
             weight = F.linear(weight, transform_matrix)
             weight = weight.reshape(
                 self.weight.size(0), self.weight.size(1), target_kernel_size,
                 target_kernel_size)
+
+            current_weight = weight
 
         return weight
 

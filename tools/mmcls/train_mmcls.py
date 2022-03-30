@@ -166,6 +166,19 @@ def main():
     algorithm = build_algorithm(cfg.algorithm)
     algorithm.eval()
 
+    import pdb
+    pdb.set_trace()
+    imgs = torch.randn(16, 3, 32, 32)
+    label = torch.randint(0, 10, (16, ))
+    loss = algorithm(img=imgs, gt_label=label)['loss']
+    print(loss)
+    loss.backward()
+
+    algorithm: torch.nn.Module
+    for name, tensor in algorithm.named_parameters():
+        if tensor.grad is None:
+            print(name)
+
     # pruner = algorithm.pruner
     # print(pruner.channel_spaces)
     def print_choice_mask(search_spaces: dict[str, dict]) -> None:
