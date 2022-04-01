@@ -125,8 +125,6 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
                                  bn_conv_links, visited)
         self.bn_conv_links = bn_conv_links
 
-        import pdb
-        pdb.set_trace()
         # a node can be the name of a conv module or a str like 'concat_{id}'
         node2parents = self.find_node_parents(non_pass_paths)
         self.node2parents = node2parents
