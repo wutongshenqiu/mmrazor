@@ -171,23 +171,11 @@ def main():
     # Difference from mmclassification
     # replace `model` to `algorithm`
     algorithm = build_algorithm(cfg.algorithm)
-    algorithm.eval()
+    algorithm.init_weights()
 
     import pdb
     pdb.set_trace()
-    imgs = torch.randn(16, 3, 32, 32)
-    label = torch.randint(0, 10, (16, ))
-    loss = algorithm(img=imgs, gt_label=label)['loss']
-    print(loss)
-    loss.backward()
 
-    algorithm: torch.nn.Module
-    for name, tensor in algorithm.named_parameters():
-        if tensor.grad is None:
-            print(name)
-
-    # pruner = algorithm.pruner
-    # print(pruner.channel_spaces)
     def print_choice_mask(search_spaces: dict[str, dict]) -> None:
         print('=' * 100)
         for space_id, space_info in search_spaces.items():
@@ -195,20 +183,28 @@ def main():
             choice_mask = modules[0].choice_mask
             print(f'space id: {space_id}, choice mask: {choice_mask}')
 
-    # mutator = algorithm.mutator
-    # print_choice_mask(mutator.search_spaces)
-    # mutator.set_max_subnet()
-    # print_choice_mask(mutator.search_spaces)
-    # mutator.set_min_subnet()
-    # print_choice_mask(mutator.search_spaces)
-    # mutator.set_random_subnet()
-    # print_choice_mask(mutator.search_spaces)
-    algorithm.init_weights()
+    imgs = torch.randn(16, 3, 32, 32)
+    label = torch.randint(0, 10, (16, ))
+    opt = torch.optim.SGD(algorithm.parameters(), lr=0.01)
+
+    for _ in range(2):
+        outputs = algorithm.train_step({'img': imgs, 'gt_label': label}, opt)
+
+    for n, p in algorithm.named_parameters():
+        print(f'name: {n}, weight: {p.norm()}')
+        if not hasattr(p, 'grad'):
+            continue
+        if p.grad is None:
+            continue
+
     import pdb
     pdb.set_trace()
 
-    pseudo_img = torch.randn(1, 3, 224, 224)
-    algorithm.architecture.forward_dummy(pseudo_img)
+    assert outputs['loss'].item() > 0
+    assert outputs['num_samples'] == 16
+    print(outputs)
+    print(algorithm.architecture.model.backbone.layer6.choices[0].
+          depthwise_conv[0]._dynamic_op.weight.grad.norm())
 
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:

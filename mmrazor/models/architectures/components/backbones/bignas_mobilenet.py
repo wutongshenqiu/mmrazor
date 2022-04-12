@@ -1,9 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import torch.nn as nn
+from typing import Dict, List, Optional, Tuple, Union
+
 from mmcls.models.backbones.base_backbone import BaseBackbone
 from mmcls.models.builder import BACKBONES
 from mmcls.models.utils import make_divisible
 from mmcv.cnn import ConvModule
+from mmcv.runner import Sequential
 from torch.nn import Module
 from torch.nn.modules.batchnorm import _BatchNorm
 
@@ -35,8 +37,6 @@ class BigNASMobileNet(BaseBackbone):
             and its variants only. Default: False.
         with_cp (bool): Use checkpoint or not. Using checkpoint will save some
             memory while slowing down the training speed. Default: False.
-        arch_setting_type (str): Specify architecture setting.
-            Default: 'original'.
         init_cfg (dict | list[dict]): initialization configuration dict to
             define initializer. OpenMMLab has implemented 6 initializers
             including ``Constant``, ``Xavier``, ``Normal``, ``Uniform``,
@@ -50,17 +50,18 @@ class BigNASMobileNet(BaseBackbone):
                      [6, 352, 2, 1]]
 
     def __init__(self,
-                 first_channels=40,
-                 last_channels=1408,
-                 widen_factor=1.,
-                 out_indices=(7, ),
-                 frozen_stages=-1,
-                 conv_cfg=None,
-                 norm_cfg=dict(type='BN'),
-                 act_cfg=dict(type='ReLU6'),
-                 norm_eval=False,
-                 with_cp=False,
-                 init_cfg=[
+                 first_channels: int = 40,
+                 last_channels: int = 1408,
+                 widen_factor: float = 1.,
+                 out_indices: Tuple[int] = (7, ),
+                 frozen_stages: int = -1,
+                 conv_cfg: Optional[Dict] = None,
+                 norm_cfg: Dict = dict(type='BN'),
+                 se_cfg: Optional[Dict] = None,
+                 act_cfg: Dict = dict(type='ReLU6'),
+                 norm_eval: bool = False,
+                 with_cp: bool = False,
+                 init_cfg: Union[Dict, List[Dict]] = [
                      dict(type='Kaiming', layer=['Conv2d']),
                      dict(
                          type='Constant',
@@ -83,6 +84,7 @@ class BigNASMobileNet(BaseBackbone):
         self.frozen_stages = frozen_stages
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
+        self.se_cfg = se_cfg
         self.act_cfg = act_cfg
         self.norm_eval = norm_eval
         self.with_cp = with_cp
@@ -162,6 +164,7 @@ class BigNASMobileNet(BaseBackbone):
                         out_channels=out_channels,
                         stride=stride,
                         expand_ratio=expand_ratio,
+                        se_cfg=self.se_cfg,
                         conv_cfg=self.conv_cfg,
                         norm_cfg=self.norm_cfg,
                         act_cfg=self.act_cfg,
@@ -169,7 +172,7 @@ class BigNASMobileNet(BaseBackbone):
 
             self.in_channels = out_channels
 
-        stage = nn.Sequential(*layers)
+        stage = Sequential(*layers)
 
         return Placeholder(
             group=f'stage{stage_idx}',

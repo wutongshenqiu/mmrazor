@@ -3,6 +3,7 @@ import copy
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from types import MethodType
+from typing import Dict
 
 import torch
 import torch.nn as nn
@@ -10,6 +11,7 @@ from mmcv.runner import BaseModule
 from ordered_set import OrderedSet
 from torch.nn.modules.batchnorm import _BatchNorm
 
+from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import PRUNERS
 from .utils import SwitchableBatchNorm2d
 
@@ -102,7 +104,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
         if module.cnt == 2:
             self.shared_module.append(self.module2name[module])
 
-    def prepare_from_supernet(self, supernet):
+    def prepare_from_supernet(self, supernet: BaseArchitecture) -> None:
         """Prepare for pruning."""
 
         module2name = OrderedDict()
@@ -134,6 +136,11 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
                 name2module[name] = module
                 var2module[id(module.weight)] = module
                 self.add_pruning_attrs(module)
+                if name.startswith('head'):
+                    print(name)
+                    print(module.weight.shape)
+                    print(module.in_mask.shape)
+                    print(module.out_mask.shape)
                 visited[name] = False
             if isinstance(module, SwitchableBatchNorm2d):
                 name2module[name] = module
@@ -263,8 +270,10 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
         """
         for module_name in self.modules_have_child:
             space_id = self.get_space_id(module_name)
-            module = self.name2module[module_name]
-            module.out_mask = subnet_dict[space_id].to(module.out_mask.device)
+            if space_id in subnet_dict:
+                module = self.name2module[module_name]
+                module.out_mask = subnet_dict[space_id].to(
+                    module.out_mask.device)
 
         for bn, conv in self.bn_conv_links.items():
             module = self.name2module[bn]
@@ -296,8 +305,9 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
                     module.in_mask = torch.cat(
                         in_mask, dim=1).to(module.in_mask.device)
             else:
-                module.in_mask = subnet_dict[space_id].to(
-                    module.in_mask.device)
+                if space_id in subnet_dict:
+                    module.in_mask = subnet_dict[space_id].to(
+                        module.in_mask.device)
 
     def export_subnet(self):
         """Generate subnet configs according to the in_mask and out_mask of a
@@ -434,7 +444,6 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
         def modified_forward(self, feature):
             if not len(self.in_mask.shape) == len(self.out_mask.shape):
                 self.in_mask = self.in_mask.reshape(self.in_mask.shape[:2])
-
             feature = feature * self.in_mask
             return original_forward(feature)
 
@@ -488,7 +497,8 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
                 node2parents[leaf_name] = OrderedSet()
         return node2parents
 
-    def build_channel_spaces(self, name2module):
+    def build_channel_spaces(
+            self, name2module: Dict[str, nn.Module]) -> Dict[str, nn.Module]:
         """Build channel search space.
 
         Args:
@@ -504,6 +514,7 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
             need_prune = True
             for key in self.except_start_keys:
                 if module_name.startswith(key):
+                    print(f'`{module_name}` will not prune!')
                     need_prune = False
                     break
             if not need_prune:

@@ -50,9 +50,9 @@ class BaseAlgorithm(BaseModule):
             self.mutable_cfg = self.load_subnet(mutable_cfg)
             self.channel_cfg = self.load_subnet(channel_cfg)
         self.architecture = build_architecture(architecture)
-
         self.deployed = False
         self._init_mutator(mutator)
+        print(self.architecture)
         self._init_pruner(pruner)
         self._init_distiller(distiller)
 

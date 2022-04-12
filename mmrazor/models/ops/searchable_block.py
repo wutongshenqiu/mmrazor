@@ -5,8 +5,9 @@ import torch.utils.checkpoint as cp
 from mmcls.models.utils import SELayer
 from mmcv.cnn.bricks import (ConvModule, DropPath, build_activation_layer,
                              build_norm_layer)
-from mmcv.runner import BaseModule
+from mmcv.runner import BaseModule, Sequential
 from torch import nn
+from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmrazor.models.architectures import Placeholder
 from ..builder import OPS
@@ -86,7 +87,7 @@ class SearchableMBBlock(BaseModule):
         ]:
             act_cfg_.setdefault('inplace', True)
         activate = build_activation_layer(act_cfg_)
-        self.depthwise_conv = nn.Sequential(
+        self.depthwise_conv = Sequential(
             Placeholder(
                 group=group,
                 space_id=f'{space_id_prefix}_depthwise_conv2d',
@@ -148,3 +149,14 @@ class SearchableMBBlock(BaseModule):
             out = _inner_forward(x)
 
         return out
+
+    def init_weights(self) -> None:
+        super().init_weights()
+
+        if not self.with_res_shortcut:
+            return
+
+        last_bn_layer: _BatchNorm = self.linear_conv.norm
+        if last_bn_layer.affine:
+            print(f'init {type(last_bn_layer).__name__} to zero!')
+            nn.init.constant_(last_bn_layer.weight, 0)

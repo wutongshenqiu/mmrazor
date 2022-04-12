@@ -15,7 +15,7 @@ class MMClsArchitecture(BaseArchitecture):
         output = img
         for name, child in self.model.named_children():
             if name == 'head':
-                output = child.fc(output[0])
+                output = child.fc(child.pre_logits(output))
             else:
                 output = child(output)
         return output

@@ -2,27 +2,30 @@
 from typing import Any, Dict
 
 import torch
+from torch.nn import Dropout
 
+from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import ALGORITHMS
 from mmrazor.models.distillers import SelfDistiller
 from mmrazor.models.mutators import BigNASMutator
-from mmrazor.models.pruners import RatioPruner
+from mmrazor.models.pruners import RangePruner
 from mmrazor.models.utils import add_prefix
 from .autoslim import AutoSlim
 
 
 @ALGORITHMS.register_module()
 class BigNAS(AutoSlim):
-    pruner: RatioPruner
+    pruner: RangePruner
     mutator: BigNASMutator
     distiller: SelfDistiller
     num_sample_training: int
+    architecture: BaseArchitecture
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
-        # assert self.pruner is not None, \
-        #     'Pruner must be configured for BigNAS!'
+        assert self.pruner is not None, \
+            'Pruner must be configured for BigNAS!'
         assert self.distiller is not None, \
             'Distiller must be configured for BigNAS!'
         assert self.mutator is not None, \
@@ -43,6 +46,7 @@ class BigNAS(AutoSlim):
 
         losses = dict()
         self._set_max_subnet()
+        self._train_dropout(True)
 
         max_subnet_losses = self.distiller.exec_teacher_forward(
             self.architecture, data)
@@ -51,6 +55,8 @@ class BigNAS(AutoSlim):
         max_subnet_loss.backward()
 
         self._set_min_subnet()
+        self._train_dropout(False)
+
         self.distiller.exec_student_forward(self.architecture, data)
         min_subnet_losses = self.distiller.compute_distill_loss(data)
         losses.update(add_prefix(min_subnet_losses, 'min_subnet'))
@@ -87,6 +93,11 @@ class BigNAS(AutoSlim):
 
     def _set_random_subnet(self) -> None:
         """set random subnet in current search space."""
-        subnet_dict = self.pruner.sample_subnet()
-        self.pruner.set_subnet(subnet_dict)
+        self.pruner.set_random_channel()
         self.mutator.set_random_subnet()
+
+    def _train_dropout(self, mode: bool = True) -> None:
+        for name, module in self.architecture.named_modules():
+            if isinstance(module, Dropout):
+                print(f'set mode of `{name}` to: {mode}')
+                module.train(mode=mode)

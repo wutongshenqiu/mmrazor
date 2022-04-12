@@ -2,6 +2,7 @@
 from typing import Dict, List, Tuple
 
 import torch
+from mmcv.runner import Sequential
 
 from ..builder import MUTABLES
 from .mixins import OrderedChoiceMixin
@@ -11,7 +12,7 @@ from .mutable_module import MutableModule
 @MUTABLES.register_module()
 class MutableSequential(MutableModule, OrderedChoiceMixin):
 
-    def __init__(self, length_list: List[int], choices: torch.nn.Sequential,
+    def __init__(self, length_list: List[int], choices: Sequential,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
