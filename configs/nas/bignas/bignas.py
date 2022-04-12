@@ -21,7 +21,7 @@ lr_config = dict(
     warmup_iters=_iterations_per_epoch * 3,
     warmup_ratio=1e-6 / _initial_lr,
     min_lr=_min_lr)
-runner = dict(max_iters=450 * _iterations_per_epoch)
+runner = dict(type='IterBasedRunner', max_iters=450 * _iterations_per_epoch)
 checkpoint_config = dict(interval=20000, max_keep_ckpts=5)
 evaluation = dict(interval=5000, metric='accuracy')
 
