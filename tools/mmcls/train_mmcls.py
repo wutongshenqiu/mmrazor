@@ -183,7 +183,7 @@ def main():
             choice_mask = modules[0].choice_mask
             print(f'space id: {space_id}, choice mask: {choice_mask}')
 
-    imgs = torch.randn(16, 3, 32, 32)
+    imgs = torch.randn(16, 3, 224, 224)
     label = torch.randint(0, 10, (16, ))
     opt = torch.optim.SGD(algorithm.parameters(), lr=0.01)
 

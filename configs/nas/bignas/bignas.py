@@ -105,6 +105,8 @@ _specials = [
 
 algorithm = dict(
     type='BigNAS',
+    resizer_config=dict(
+        shape_list=[192, 224, 288, 320], interpolation_type='bicubic'),
     architecture=dict(
         type='MMClsArchitecture',
         model=model,
