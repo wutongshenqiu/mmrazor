@@ -4,6 +4,8 @@ from typing import Any, Generic, List, TypeVar
 
 from mmcv.runner import BaseModule
 
+from mmrazor.utils import master_only_print
+
 
 class BaseOP(BaseModule):
     """Base class for searchable operations.
@@ -30,10 +32,12 @@ CHOICE_TYPE = TypeVar('CHOICE_TYPE')
 
 
 class BaseDynamicOP(ABC, Generic[CHOICE_TYPE]):
+    choice_map_key: str
 
     def __init__(self, choices: List[CHOICE_TYPE]) -> None:
         self._choices = sorted(list(set(choices)))
-        print(f'{type(self).__name__} with choices: {self._choices}')
+        master_only_print(
+            f'{type(self).__name__} with choices: {self._choices}')
 
     @abstractmethod
     def set_choice(self, choice: CHOICE_TYPE) -> None:

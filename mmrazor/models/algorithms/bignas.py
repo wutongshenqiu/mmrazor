@@ -11,6 +11,7 @@ from mmrazor.models.distillers import SelfDistiller
 from mmrazor.models.mutators import BigNASMutator
 from mmrazor.models.pruners import RangePruner
 from mmrazor.models.utils import add_prefix
+from mmrazor.utils import master_only_print
 from .autoslim import AutoSlim
 
 
@@ -106,10 +107,29 @@ class BigNAS(AutoSlim):
     num_sample_training: int
     architecture: BaseArchitecture
 
-    def __init__(self, resizer_config: Dict, **kwargs: Any) -> None:
+    def __init__(self,
+                 resizer_config: Optional[Dict] = None,
+                 **kwargs: Any) -> None:
+        # HACK
+        # pruner will raise error if pruned model is not max
+        retraining = kwargs.get('retraining', False)
+        if retraining:
+            channel_cfg_path = kwargs.pop('channel_cfg')
+            channel_cfg = self.load_subnet(channel_cfg_path)
+            mutable_cfg_path = kwargs.pop('mutable_cfg')
+            mutable_cfg = self.load_subnet(mutable_cfg_path)
+        kwargs['retraining'] = False
         super().__init__(**kwargs)
+        if retraining:
+            self.retraining = True
+            self._load_subnet_config(
+                channel_cfg=channel_cfg, mutable_cfg=mutable_cfg)
 
-        self._resizer = _InputResizer(**resizer_config)
+        if not self.retraining:
+            if resizer_config is None:
+                raise ValueError('`resizer_config` must be configured when '
+                                 'training supernet')
+            self._resizer = _InputResizer(**resizer_config)
 
         assert self.pruner is not None, \
             'Pruner must be configured for BigNAS!'
@@ -130,8 +150,31 @@ class BigNAS(AutoSlim):
                 accumulate gradient
         """
         optimizer.zero_grad()
-        losses = dict()
 
+        if self.retraining:
+            losses = self._retrain_step(data)
+        else:
+            losses = self._train_supernet_step(data)
+
+        # TODO: clip grad norm
+        optimizer.step()
+
+        loss, log_vars = self._parse_losses(losses)
+        outputs = dict(
+            loss=loss, log_vars=log_vars, num_samples=len(data['img'].data))
+
+        return outputs
+
+    def _retrain_step(self, data: Dict) -> Dict:
+        model_losses = self(**data)
+        losses = add_prefix(model_losses, 'retrain_subnet')
+        model_loss, _ = self._parse_losses(model_losses)
+        model_loss.backward()
+
+        return losses
+
+    def _train_supernet_step(self, data: Dict) -> Dict:
+        losses = dict()
         original_img = data['img'].clone()
 
         self._set_max_subnet()
@@ -170,15 +213,6 @@ class BigNAS(AutoSlim):
             subnet_loss, _ = self._parse_losses(subnet_losses)
             subnet_loss.backward()
 
-        # TODO: clip grad norm
-        optimizer.step()
-
-        loss, log_vars = self._parse_losses(losses)
-        outputs = dict(
-            loss=loss, log_vars=log_vars, num_samples=len(data['img'].data))
-
-        return outputs
-
     def _set_min_subnet(self) -> None:
         """set minimum subnet in current search space."""
         self.pruner.set_min_channel()
@@ -200,5 +234,17 @@ class BigNAS(AutoSlim):
     def _train_dropout(self, mode: bool = True) -> None:
         for name, module in self.architecture.named_modules():
             if isinstance(module, Dropout):
-                print(f'set mode of `{name}` to: {mode}')
+                master_only_print(f'set mode of `{name}` to: {mode}')
                 module.train(mode=mode)
+
+    def _load_subnet_config(self, mutable_cfg: Dict,
+                            channel_cfg: Dict) -> None:
+        if not isinstance(channel_cfg, dict):
+            raise ValueError('Type of `channel_cfg` must be dict, '
+                             f'but got: {type(channel_cfg)}')
+        if not isinstance(mutable_cfg, dict):
+            raise ValueError('Type of `mutable_cfg` must be dict, '
+                             f'but got: {type(channel_cfg)}')
+
+        self.pruner.deploy_subnet(self.architecture, channel_cfg)
+        self.mutator.deploy_subnet(self.architecture, mutable_cfg)

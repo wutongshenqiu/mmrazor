@@ -98,3 +98,25 @@ class BigNASMutator(BaseMutator):
     def set_random_subnet(self) -> None:
         """set random subnet in current search space."""
         self._sample_set_subnet('random')
+
+    def export_subnet(self) -> Dict:
+        """Export mutator subnet config.
+
+        Returns:
+            Dict: _description_
+        """
+        subnet_dict = dict()
+        for space_id, space_info in self.search_spaces.items():
+            for module in space_info['modules']:
+                module: MutableModule
+                subnet_dict[space_id] = module.current_choice_map
+
+        return subnet_dict
+
+    def deploy_subnet(self, supernet: torch.nn.Module,
+                      subnet_dict: Dict) -> None:
+        for space_id, space_info in self.search_spaces.items():
+            for module in space_info['modules']:
+                module: MutableModule
+                choice_map = subnet_dict[space_id]
+                module.set_choice_map(choice_map)

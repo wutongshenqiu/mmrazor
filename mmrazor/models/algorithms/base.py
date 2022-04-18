@@ -52,7 +52,6 @@ class BaseAlgorithm(BaseModule):
         self.architecture = build_architecture(architecture)
         self.deployed = False
         self._init_mutator(mutator)
-        print(self.architecture)
         self._init_pruner(pruner)
         self._init_distiller(distiller)
 

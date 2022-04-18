@@ -117,6 +117,9 @@ class MutableModule(BaseModule, metaclass=ABCMeta):
             return torch.ones(self.num_choices) * 1.0
 
     # TODO
+    # function name is a little strange
+    # should be abstract method, since each mutable
+    # may have different export operation
     # set maybe better than list when using `in` operation
     def export(self, chosen: List[str]) -> None:
         """Delete not chosen ``OPS`` in the choices.

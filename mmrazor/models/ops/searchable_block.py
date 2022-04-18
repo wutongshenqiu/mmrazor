@@ -10,6 +10,7 @@ from torch import nn
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmrazor.models.architectures import Placeholder
+from mmrazor.utils import master_only_print
 from ..builder import OPS
 
 
@@ -158,5 +159,5 @@ class SearchableMBBlock(BaseModule):
 
         last_bn_layer: _BatchNorm = self.linear_conv.norm
         if last_bn_layer.affine:
-            print(f'init {type(last_bn_layer).__name__} to zero!')
+            master_only_print(f'init {type(last_bn_layer).__name__} to zero!')
             nn.init.constant_(last_bn_layer.weight, 0)

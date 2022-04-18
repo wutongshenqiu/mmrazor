@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from mmrazor.models.ops.base import CHOICE_TYPE, BaseDynamicOP
+from mmrazor.utils import master_only_print
 from ..builder import MUTABLES, build_op
 from .mixins import OrderedChoiceMixin
 from .mutable_module import MutableModule
@@ -14,6 +15,7 @@ from .mutable_module import MutableModule
 
 @MUTABLES.register_module()
 class DynamicOP(MutableModule, OrderedChoiceMixin):
+    choice_map_key: str = 'dynamic'
 
     def __init__(self, choices: List[CHOICE_TYPE], dynamic_cfg: Dict,
                  choice_args: Dict, **kwargs: Any) -> None:
@@ -40,14 +42,49 @@ class DynamicOP(MutableModule, OrderedChoiceMixin):
         return tuple(map(str, range(len(self.choices))))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        choice_idx = self.choice_mask.nonzero()[0].item()
-        choice = self.choices[choice_idx]
-        print(f'space id: {self.space_id}, current choice: {choice}, '
-              f'max choice: {self.choices[-1]}')
+        choice = self.current_choice
+        master_only_print(
+            f'space id: {self.space_id}, current choice: {choice}, '
+            f'max choice: {self.choices[-1]}')
 
         self._dynamic_op.set_choice(choice)
 
         return self._dynamic_op(x)
+
+    @property
+    def current_choice(self) -> int:
+        choice_idx = self.choice_mask.nonzero()[0].item()
+
+        return self.choices[choice_idx]
+
+    def set_choice(self, choice: Any) -> None:
+        try:
+            choice_idx = self.choices.index(choice)
+        except ValueError:
+            raise ValueError(f'Expected choices: {self.choices}, '
+                             f'but got: {choice}')
+        choice_mask = torch.zeros_like(self.choice_mask)
+        choice_mask[choice_idx] = 1
+
+        self.set_choice_mask(choice_mask)
+
+    def set_choice_map(self, choice_map: Dict[str, int]) -> None:
+        choice_map_key = self._get_choice_map_key()
+        assert choice_map_key in choice_map
+
+        self.set_choice(choice_map[choice_map_key])
+
+    @property
+    def current_choice_map(self) -> Dict[str, int]:
+        choice_map_key = self._get_choice_map_key()
+        return {
+            choice_map_key: self.current_choice,
+            f'max_{choice_map_key}': self.choices[-1],
+            f'min_{choice_map_key}': self.choices[0]
+        }
+
+    def _get_choice_map_key(self) -> str:
+        return getattr(self._dynamic_op, 'choice_map_key', self.choice_map_key)
 
 
 class MutableOP(MutableModule):

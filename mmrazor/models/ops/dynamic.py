@@ -8,6 +8,7 @@ from torch.nn import Conv2d
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
 
+from mmrazor.utils import master_only_print
 from ..builder import OPS
 from .base import BaseDynamicOP
 
@@ -29,6 +30,7 @@ def _register_dynamic_ops() -> None:
 
 @OPS.register_module()
 class DynamicConv2d(BaseDynamicOP[int], Conv2d):
+    choice_map_key: str = 'kernel_size'
 
     def __init__(self, choices: List[int], in_channels: int, out_channels: int,
                  **other_conv_kwargs) -> None:
@@ -107,9 +109,9 @@ class DynamicConv2d(BaseDynamicOP[int], Conv2d):
                 self,
                 self._get_transform_matrix_name(
                     src=source_kernel_size, tar=target_kernel_size))
-            print(f'source_kernel_size: {source_kernel_size}, '
-                  f'target_kernel_size: {target_kernel_size}')
-            print(f'transform matrix: {transform_matrix.shape}')
+            master_only_print(f'source_kernel_size: {source_kernel_size}, '
+                              f'target_kernel_size: {target_kernel_size}')
+            master_only_print(f'transform matrix: {transform_matrix.shape}')
 
             start_offset, end_offset = self._get_current_kernel_pos(
                 source_kernel_size=source_kernel_size,
@@ -147,6 +149,7 @@ class DynamicConv2d(BaseDynamicOP[int], Conv2d):
 @OPS.register_module()
 class DynamicConvModule(BaseDynamicOP[int], ConvModule):
     conv: BaseDynamicOP[int]
+    choice_map_key: str = 'kernel_size'
 
     def __init__(self, choices: List[int], **conv_module_kwargs) -> None:
         conv_cfg = conv_module_kwargs.get('conv_cfg')
@@ -155,8 +158,8 @@ class DynamicConvModule(BaseDynamicOP[int], ConvModule):
                 f'`conv_cfg` must contain dynamic conv ops, '
                 f'but got: {conv_cfg}, available ops: {_DYNAMIC_CONV_OPS}')
         conv_cfg['choices'] = choices
-        print(choices)
-        print(conv_module_kwargs)
+        master_only_print(f'choices: {choices}')
+        master_only_print(f'conv module kwargs: {conv_module_kwargs}')
         BaseDynamicOP.__init__(self, choices)
         ConvModule.__init__(self, **conv_module_kwargs)
 

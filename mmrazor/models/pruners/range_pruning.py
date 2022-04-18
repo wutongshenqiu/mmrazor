@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import PRUNERS
+from mmrazor.utils import master_only_print
 from .structure_pruning import StructurePruner
 
 
@@ -59,8 +60,9 @@ class RangePruner(StructurePruner):
         self._sorted_spaces = sorted_spaces
 
         for space_id in self._sorted_spaces:
-            print(f'space: {space_id}, config: {self._space2config[space_id]}')
-            print(f'modules: {self._space2modules[space_id]}')
+            master_only_print(
+                f'space: {space_id}, config: {self._space2config[space_id]}')
+            master_only_print(f'modules: {self._space2modules[space_id]}')
 
     def _map_space_to_modules(self) -> Dict[str, List[str]]:
         group2modules: Dict[str, List[str]] = dict()
@@ -125,8 +127,9 @@ class RangePruner(StructurePruner):
             for module in self._space2modules[space_id]:
                 for special in range_config.specials:
                     if special.in_key in module:
-                        print(f'special module: {module}, '
-                              f'parent: {self.node2parents[module][0]}')
+                        master_only_print(
+                            f'special module: {module}, '
+                            f'parent: {self.node2parents[module][0]}')
                         if special.refer == 'parent':
                             parent_module = self.node2parents[module][0]
                             parent_space = self._module2space[parent_module]
@@ -166,13 +169,15 @@ class RangePruner(StructurePruner):
 
         for space_id in self._sorted_spaces:
             mask = subnet_dict[space_id]
-            print('=' * 100)
-            print(f'space: {space_id}, layer: {self._space2config[space_id]}')
+            master_only_print('=' * 100)
+            master_only_print(
+                f'space: {space_id}, layer: {self._space2config[space_id]}')
             for module in self._space2modules[space_id]:
-                print(f'module: {module}, '
-                      f'out channels: {self._get_mask_channels(mask)}, '
-                      f'max channels: {mask.size(1)}')
-            print('=' * 100)
+                master_only_print(
+                    f'module: {module}, '
+                    f'out channels: {self._get_mask_channels(mask)}, '
+                    f'max channels: {mask.size(1)}')
+            master_only_print('=' * 100)
 
         return subnet_dict
 

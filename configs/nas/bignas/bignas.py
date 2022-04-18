@@ -45,12 +45,10 @@ model = dict(
     # TODO
     # dropout before linear in spring
     head=dict(
-        type='StackedLinearClsHead',
-        num_classes=1000,
+        type='mmrazor.LinearClsHead',
         in_channels=1408,
-        mid_channels=[1280],
+        num_classes=1000,
         dropout_rate=0.2,
-        act_cfg=dict(type='HSwish'),
         loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
         init_cfg=dict(
             type='Normal', layer='Linear', mean=0., std=0.01, bias=0.),
@@ -116,8 +114,8 @@ algorithm = dict(
         type='SelfDistiller',
         components=[
             dict(
-                student_module='head.layers.1.fc',
-                teacher_module='head.layers.1.fc',
+                student_module='head._layers.1',
+                teacher_module='head._layers.1',
                 losses=[
                     dict(
                         type='KLDivergence',

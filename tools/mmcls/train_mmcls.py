@@ -173,39 +173,6 @@ def main():
     algorithm = build_algorithm(cfg.algorithm)
     algorithm.init_weights()
 
-    import pdb
-    pdb.set_trace()
-
-    def print_choice_mask(search_spaces: dict[str, dict]) -> None:
-        print('=' * 100)
-        for space_id, space_info in search_spaces.items():
-            modules = space_info['modules']
-            choice_mask = modules[0].choice_mask
-            print(f'space id: {space_id}, choice mask: {choice_mask}')
-
-    imgs = torch.randn(16, 3, 224, 224)
-    label = torch.randint(0, 10, (16, ))
-    opt = torch.optim.SGD(algorithm.parameters(), lr=0.01)
-
-    for _ in range(2):
-        outputs = algorithm.train_step({'img': imgs, 'gt_label': label}, opt)
-
-    for n, p in algorithm.named_parameters():
-        print(f'name: {n}, weight: {p.norm()}')
-        if not hasattr(p, 'grad'):
-            continue
-        if p.grad is None:
-            continue
-
-    import pdb
-    pdb.set_trace()
-
-    assert outputs['loss'].item() > 0
-    assert outputs['num_samples'] == 16
-    print(outputs)
-    print(algorithm.architecture.model.backbone.layer6.choices[0].
-          depthwise_conv[0]._dynamic_op.weight.grad.norm())
-
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
