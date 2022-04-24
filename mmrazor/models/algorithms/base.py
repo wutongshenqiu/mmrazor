@@ -1,7 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from collections import OrderedDict
 
-import mmcv.fileio
 import torch
 import torch.distributed as dist
 from mmcv.runner import BaseModule
@@ -41,44 +40,16 @@ class BaseAlgorithm(BaseModule):
         distiller=None,
         retraining=False,
         init_cfg=None,
-        mutable_cfg=None,
-        channel_cfg=None,
     ):
         super(BaseAlgorithm, self).__init__(init_cfg)
         self.retraining = retraining
-        if self.retraining:
-            self.mutable_cfg = self.load_subnet(mutable_cfg)
-            self.channel_cfg = self.load_subnet(channel_cfg)
+
         self.architecture = build_architecture(architecture)
         self.deployed = False
+
         self._init_mutator(mutator)
         self._init_pruner(pruner)
         self._init_distiller(distiller)
-
-    def load_subnet(self, subnet_path):
-        """Load subnet searched out in search stage.
-
-        Args:
-            subnet_path (str | list[str] | tuple(str)): The path of saved
-                subnet file, its suffix should be .yaml.
-            There may be several subnet searched out in some algorithms.
-
-        Returns:
-            dict | list[dict]: Config(s) for subnet(s) searched out.
-        """
-        if subnet_path is None:
-            return
-
-        if isinstance(subnet_path, str):
-            cfg = mmcv.fileio.load(subnet_path)
-        elif isinstance(subnet_path, (list, tuple)):
-            cfg = list()
-            for path in subnet_path:
-                cfg.append(mmcv.fileio.load(path))
-        else:
-            raise NotImplementedError
-
-        return cfg
 
     def _init_mutator(self, mutator):
         """Build registered mutators and make preparations.
@@ -87,17 +58,11 @@ class BaseAlgorithm(BaseModule):
             mutator (dict): Config for mutator, which is an algorithm component
                 for NAS.
         """
-        if mutator is None:
+        if mutator is None or self.retraining:
             self.mutator = None
             return
         self.mutator = build_mutator(mutator)
-        self.mutator.prepare_from_supernet(self.architecture)
-        if self.retraining:
-            if isinstance(self.mutable_cfg, dict):
-                self.mutator.deploy_subnet(self.architecture, self.mutable_cfg)
-                self.deployed = True
-            else:
-                raise NotImplementedError
+        self.mutator.prepare_from_supernet(self.architecture.model)
 
     def _init_pruner(self, pruner):
         """Build registered pruners and make preparations.
@@ -106,19 +71,11 @@ class BaseAlgorithm(BaseModule):
             pruner (dict): Config for pruner, which is an algorithm component
                 for pruning.
         """
-        if pruner is None:
+        if pruner is None or self.retraining:
             self.pruner = None
             return
         self.pruner = build_pruner(pruner)
-
-        if self.retraining:
-            if isinstance(self.channel_cfg, dict):
-                self.pruner.deploy_subnet(self.architecture, self.channel_cfg)
-                self.deployed = True
-            else:
-                raise NotImplementedError
-        else:
-            self.pruner.prepare_from_supernet(self.architecture)
+        self.pruner.prepare_from_supernet(self.architecture)
 
     def _init_distiller(self, distiller):
         """Build registered distillers and make preparations.
