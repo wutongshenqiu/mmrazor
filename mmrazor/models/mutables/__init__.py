@@ -1,13 +1,10 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from .mixins import OrderedChoiceMixin
-from .mutable_container import MutableSequential
-from .mutable_edge import DifferentiableEdge, GumbelEdge, MutableEdge
-from .mutable_module import MutableModule
-from .mutable_op import (DifferentiableOP, DynamicOP, GumbelOP, MutableOP,
-                         OneShotOP)
+from .mutable_container import DynamicSequential
+from .mutable_op import DifferentiableOP, DynamicKernelConv2d, OneShotOP
 
 __all__ = [
-    'MutableModule', 'MutableOP', 'MutableEdge', 'DifferentiableOP',
-    'DifferentiableEdge', 'GumbelEdge', 'GumbelOP', 'OneShotOP',
-    'MutableSequential', 'DynamicOP', 'OrderedChoiceMixin'
+    'DynamicSequential',
+    'DynamicKernelConv2d',
+    'DifferentiableOP',
+    'OneShotOP',
 ]

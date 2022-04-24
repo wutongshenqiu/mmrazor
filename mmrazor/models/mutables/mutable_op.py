@@ -1,242 +1,239 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import copy
-from typing import Any, Dict, List, Tuple
+from typing import Tuple
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import Tensor, nn
+from torch.nn import functional as F
 
-from mmrazor.models.ops.base import CHOICE_TYPE, BaseDynamicOP
+from mmrazor.models.builder import build_op
 from mmrazor.utils import master_only_print
-from ..builder import MUTABLES, build_op
-from .mixins import OrderedChoiceMixin
-from .mutable_module import MutableModule
+from .mixins import DiffentiableMixin, DynamicMixin, OneShotMixin
 
 
-@MUTABLES.register_module()
-class DynamicOP(MutableModule, OrderedChoiceMixin):
-    choice_map_key: str = 'dynamic'
+class OneShotOP(nn.Module, OneShotMixin):
 
-    def __init__(self, choices: List[CHOICE_TYPE], dynamic_cfg: Dict,
-                 choice_args: Dict, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self) -> None:
+        super().__init__()
+        self.candidate_ops = nn.ModuleDict()
 
-        # `dynamic_cfg` has higher priority
-        choice_args.update(dynamic_cfg, choices=choices)
-        op = build_op(choice_args)
-        assert isinstance(op, BaseDynamicOP), \
-            f'OP must be dynamic, but got type: {type(op).__name__}'
-
-        # the choices is already in order
-        self.choices = op.choices()
-        self._dynamic_op = op
-
-        self.choice_mask = self.build_choice_mask()
-        self.choice_mask = self.max_choice_mask
-
-    def build_choices(self, cfg: Dict) -> None:
-        pass
+    def init_ops(self, ops):
+        for name, op_cfg in ops.items():
+            assert name not in self.candidate_ops
+            self.candidate_ops[name] = build_op(op_cfg)
 
     @property
-    def choice_names(self) -> Tuple[str]:
-        return tuple(map(str, range(len(self.choices))))
+    def choices(self):
+        return self.candidate_ops.keys()
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        choice = self.current_choice
-        master_only_print(
-            f'space id: {self.space_id}, current choice: {choice}, '
-            f'max choice: {self.choices[-1]}')
+    def deploy(self, chosen):
 
-        self._dynamic_op.set_choice(choice)
+        for name in self.choices:
+            if name != chosen:
+                self.candidate_ops.pop(name)
+        self.deployed = True
 
-        return self._dynamic_op(x)
+    def forward(self, x, sampled=None):
+        if self.deployed:
+            assert sampled is None
+            return self.forward_deploy(x)
+        elif sampled:
+            return self.forward_sample(x, sampled)
+
+    def forward_deploy(self, x):
+        assert self.num_choices == 1
+        chosen = self.choices[0]
+        return self.candidate_ops[chosen](x)
+
+    def forward_sample(self, x, sampled):
+        return self.candidate_ops[sampled](x)
+
+
+class DifferentiableOP(nn.Module, DiffentiableMixin):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.candidate_ops = nn.ModuleDict()
+
+    def init_ops(self, ops):
+        for name, op_cfg in ops.items():
+            assert name not in self.candidate_ops
+            self.candidate_ops[name] = build_op(op_cfg)
 
     @property
-    def current_choice(self) -> int:
-        choice_idx = self.choice_mask.nonzero()[0].item()
-
-        return self.choices[choice_idx]
-
-    def set_choice(self, choice: Any) -> None:
-        try:
-            choice_idx = self.choices.index(choice)
-        except ValueError:
-            raise ValueError(f'Expected choices: {self.choices}, '
-                             f'but got: {choice}')
-        choice_mask = torch.zeros_like(self.choice_mask)
-        choice_mask[choice_idx] = 1
-
-        self.set_choice_mask(choice_mask)
-
-    def set_choice_map(self, choice_map: Dict[str, int]) -> None:
-        choice_map_key = self._get_choice_map_key()
-        assert choice_map_key in choice_map
-
-        self.set_choice(choice_map[choice_map_key])
+    def choices(self):
+        return self.candidate_ops.keys()
 
     @property
-    def current_choice_map(self) -> Dict[str, int]:
-        choice_map_key = self._get_choice_map_key()
-        return {
-            choice_map_key: self.current_choice,
-            f'max_{choice_map_key}': self.choices[-1],
-            f'min_{choice_map_key}': self.choices[0]
-        }
+    def num_choices(self):
+        return len(self.candidate_ops.keys())
 
-    def _get_choice_map_key(self) -> str:
-        return getattr(self._dynamic_op, 'choice_map_key', self.choice_map_key)
+    def deploy(self, chosen):
 
+        for name in self.choices:
+            if name != chosen:
+                self.candidate_ops.pop(name)
+        self.deployed = True
 
-class MutableOP(MutableModule):
-    """An important type of ``MUTABLES``, inherits from ``MutableModule``.
+    def forward(self, x, arch_params=None):
+        if self.deployed:
+            assert arch_params is None
+            return self.forward_deploy(x)
+        elif arch_params:
+            return self.forward_train(x, arch_params)
 
-    Args:
-        choices (dict): The configs for the choices, the chosen ``OPS`` used to
-            combine ``MUTABLES``.
-        choice_args (dict): The args used to set chosen ``OPS``.
-    """
+    def forward_deploy(self, x):
+        assert self.num_choices == 1
+        chosen = self.choices[0]
+        return self.candidate_ops[chosen](x)
 
-    def __init__(self, choices, choice_args, **kwargs):
-        super(MutableOP, self).__init__(**kwargs)
-        self.choices = self.build_choices(choices, choice_args)
-        self.choice_mask = self.build_choice_mask()
-        self.full_choice_names = copy.deepcopy(self.choice_names)
+    def forward_train(self, x, arch_params):
 
-    def build_choices(self, cfgs, choice_args):
-        """Build all chosen ``OPS`` used to combine ``MUTABLES``, and the
-        choices will be sampled.
-
-        Args:
-            cfgs (dict): The configs for the choices.
-            choice_args (dict): The args used to set chosen ``OPS``.
-
-        Returns:
-            torch.nn.ModuleDict: Consists of chosen ``OPS`` in the arg `cfgs`.
-        """
-        choices = nn.ModuleDict()
-        for name, cfg in cfgs.items():
-            cfg.update(choice_args)
-            op_module = build_op(cfg)
-            choices.add_module(name, op_module)
-        return choices
-
-
-@MUTABLES.register_module()
-class OneShotOP(MutableOP):
-    """A type of ``MUTABLES`` for the one-shot NAS."""
-
-    def __init__(self, **kwargs):
-        super(OneShotOP, self).__init__(**kwargs)
-        assert self.num_chosen == 1
-
-    def forward(self, x):
-        """Forward computation for chosen ``OPS``, in one-shot NAS, the number
-        of chosen ``OPS`` can only be one.
-
-        Args:
-            x (tensor | tuple[tensor]): x could be a Torch.tensor or a tuple of
-                Torch.tensor, containing input data for forward computation.
-
-        Returns:
-            torch.Tensor: The result of forward.
-        """
-        outputs = list()
-        for name, chosen_bool in zip(self.full_choice_names, self.choice_mask):
-            if name not in self.choice_names:
-                continue
-            if not chosen_bool:
-                continue
-            module = self.choices[name]
-            outputs.append(module(x))
-
-        assert len(outputs) > 0
+        probs = F.softmax(arch_params, dim=-1)
+        outputs = [op(x) for op in self.candidate_ops.values()]
+        outputs = [o * p for o, p in zip(outputs, probs)]
 
         return sum(outputs)
 
 
-@MUTABLES.register_module()
-class DifferentiableOP(MutableOP):
-    """Differentiable OP.
+class DynamicKernelConv2d(DynamicMixin, nn.Conv2d):
 
-    Search the best module from choices by learnable parameters.
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 dynamic_kernel_size,
+                 stride=1,
+                 padding_mode='same',
+                 dilation=1,
+                 groups=1,
+                 bias=True):
+        super().__init__(in_channels, out_channels, max(dynamic_kernel_size),
+                         stride, 0, dilation, groups, bias)
 
-    Args:
-        with_arch_param (bool): whether build learable architecture parameters.
-    """
+        self.dynamic_kernel_size = sorted(
+            list(dynamic_kernel_size), reverse=True)
+        self._max_kernel_size = max(self.dynamic_kernel_size)
 
-    def __init__(self, with_arch_param, **kwargs):
-        super(DifferentiableOP, self).__init__(**kwargs)
-        self.with_arch_param = with_arch_param
+        for i in range(len(self.dynamic_kernel_size) - 1):
+            source_kernel_size = self.dynamic_kernel_size[i]
+            target_kernel_size = self.dynamic_kernel_size[i + 1]
+            transform_matrix_name = self._get_transform_matrix_name(
+                src=source_kernel_size, tar=target_kernel_size)
+            self.register_parameter(
+                name=transform_matrix_name,
+                param=nn.Parameter(torch.eye(target_kernel_size**2)))
 
-    def build_arch_param(self):
-        """build learnable architecture parameters."""
-        if self.with_arch_param:
-            return nn.Parameter(torch.randn(self.num_choices) * 1e-3)
-        else:
-            return None
+        self._deployed = False
+        self._choice_probs = [1 / len(self.dynamic_kernel_size)] * len(
+            self.dynamic_kernel_size)
 
-    def compute_arch_probs(self, arch_param):
-        """compute chosen probs according architecture parameters."""
-        return F.softmax(arch_param, -1)
+    @property
+    def num_choices(self) -> int:
+        return len(self.dynamic_kernel_size)
 
-    def forward(self, x, arch_param=None):
-        """forward function.
+    @property
+    def min_choice(self):
+        return self.choices[-1]
 
-        In some algorithms, there are several ``MutableModule`` share the same
-        architecture parameters. So the architecture parameters are passed
-        in as args.
+    @property
+    def max_choice(self):
+        return self.choices[0]
 
-        Args:
-            prev_inputs (list[torch.Tensor]): each choice's inputs.
-            arch_param (torch.nn.Parameter): architecture parameters.
-        """
-        if self.with_arch_param:
-            assert arch_param is not None, \
-                f'In {self.space_id}, the arch_param can not be None when the \
-                    with_arch_param=True.'
+    @property
+    def choice_probs(self):
+        assert sum(self._choice_probs) == 1
+        return self._choice_probs
 
-            # 1. compute choices' probs.
-            probs = self.compute_arch_probs(arch_param)
+    @choice_probs.setter
+    def choice_probs(self, value):
+        self._choice_probs = value
 
-            # 2. compute every op's outputs.
-            outputs = list()
-            for prob, module in zip(probs, self.choice_modules):
-                if prob > 0:
-                    outputs.append(prob * module(x))
+    @property
+    def deployed(self):
+        return self._deployed
 
-        else:
-            outputs = list()
-            for name, chosen_bool in zip(self.full_choice_names,
-                                         self.choice_mask):
-                if name not in self.choice_names:
-                    continue
-                if not chosen_bool:
-                    continue
-                module = self.choices[name]
-                outputs.append(module(x))
+    @deployed.setter
+    def deployed(self, value):
+        self._deployed = value
 
-            assert len(outputs) > 0
-        return sum(outputs)
+    @property
+    def choices(self):
+        # TODO verify sorted
+        return self.dynamic_kernel_size
 
+    def deploy(self, chosen):
+        weight = self._get_weight(chosen)
+        padding = self._get_padding(chosen)
+        self.weight = nn.Parameter(weight)
+        self.padding = (padding, padding)
+        self.deployed = True
 
-@MUTABLES.register_module()
-class GumbelOP(DifferentiableOP):
-    """Gumbel OP.
+    def forward_deploy(self, x):
+        # import pdb;pdb.set_trace()
+        return nn.Conv2d.forward(self, x)
 
-    Search the best module from choices by gumbel trick.
-    """
+    def forward_sample(self, input: Tensor, sampled=None) -> Tensor:
+        weight = self._get_weight(sampled)
+        padding = self._get_padding(sampled)
 
-    def __init__(self, tau=1.0, hard=True, **kwargs):
-        super(GumbelOP, self).__init__(**kwargs)
-        self.tau = tau
-        self.hard = hard
+        return F.conv2d(
+            input=input,
+            weight=weight,
+            bias=self.bias,
+            stride=self.stride,
+            padding=padding,
+            dilation=self.dilation,
+            groups=self.groups)
 
-    def set_temperature(self, temperature):
-        """Modify the temperature."""
-        self.temperature = temperature
+    @staticmethod
+    def _get_transform_matrix_name(src: int, tar: int) -> str:
+        return f'transform_matrix_{src}to{tar}'
 
-    def compute_arch_probs(self, arch_param):
-        """compute chosen probs by gumbel trick."""
-        probs = F.gumbel_softmax(
-            arch_param, tau=self.tau, hard=self.hard, dim=-1)
-        return probs
+    def _get_weight(self, kernel_size) -> torch.Tensor:
+        if kernel_size == self._max_kernel_size:
+            return self.weight
+
+        current_weight = self.weight[:, :, :, :]
+        for i in range(len(self.choices) - 1):
+            source_kernel_size = self.choices[i]
+            if source_kernel_size <= kernel_size:
+                break
+            target_kernel_size = self.choices[i + 1]
+            transform_matrix = getattr(
+                self,
+                self._get_transform_matrix_name(
+                    src=source_kernel_size, tar=target_kernel_size))
+            master_only_print(f'source_kernel_size: {source_kernel_size}, '
+                              f'target_kernel_size: {target_kernel_size}')
+            master_only_print(f'transform matrix: {transform_matrix.shape}')
+
+            start_offset, end_offset = self._get_current_kernel_pos(
+                source_kernel_size=source_kernel_size,
+                target_kernel_size=target_kernel_size)
+            target_weight = current_weight[:, :, start_offset:end_offset,
+                                           start_offset:end_offset]
+            target_weight = target_weight.reshape(-1, target_kernel_size**2)
+            target_weight = F.linear(target_weight, transform_matrix)
+            target_weight = target_weight.reshape(
+                self.weight.size(0), self.weight.size(1), target_kernel_size,
+                target_kernel_size)
+
+            current_weight = target_weight
+
+        return current_weight
+
+    @staticmethod
+    def _get_current_kernel_pos(source_kernel_size: int,
+                                target_kernel_size: int) -> Tuple[int, int]:
+        assert source_kernel_size > target_kernel_size, \
+            '`source_kernel_size` must greater than `target_kernel_size`'
+
+        center = source_kernel_size >> 1
+        current_offset = target_kernel_size >> 1
+
+        start_offset = center - current_offset
+        end_offset = center + current_offset + 1
+
+        return start_offset, end_offset
+
+    def _get_padding(self, kernel_size) -> int:
+        return kernel_size >> 1
