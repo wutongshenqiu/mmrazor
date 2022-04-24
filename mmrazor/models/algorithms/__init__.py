@@ -2,6 +2,4 @@
 from .bignas import BigNAS
 from .general_distill import GeneralDistill
 
-__all__ = [
-    'GeneralDistill', 'BigNAS'
-]
+__all__ = ['GeneralDistill', 'BigNAS']
