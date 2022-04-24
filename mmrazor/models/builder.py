@@ -1,4 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from copy import deepcopy
+
 from mmcv.cnn import MODELS as MMCV_MODELS
 from mmcv.utils import Registry
 
@@ -47,7 +49,19 @@ def build_mutable(cfg):
 
 def build_op(cfg):
     """Build op."""
-    return OPS.build(cfg)
+
+    # TODO just example
+    args_mapping = getattr(cfg, 'args_mapping', None)
+    if args_mapping:
+        cfg_ = deepcopy(cfg)
+        for origin_key, mapping_key in args_mapping.items():
+            val = cfg_.pop(origin_key)
+            assert mapping_key not in cfg_
+            cfg_[mapping_key] = val
+    else:
+        cfg_ = cfg
+
+    return OPS.build(cfg_)
 
 
 def build_loss(cfg):
