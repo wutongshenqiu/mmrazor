@@ -54,62 +54,55 @@ model = dict(
             type='Normal', layer='Linear', mean=0., std=0.01, bias=0.),
         topk=(1, 5)))
 
-mutator = dict(
-    type='BigNASMutator',
-    placeholder_mapping=dict(
-        dynamic_conv2d_k3=dict(
-            type='DynamicOP',
-            choices=[3],
-            dynamic_cfg=dict(type='DynamicConv2d')),
-        dynamic_conv2d_k35=dict(
-            type='DynamicOP',
-            choices=[3, 5],
-            dynamic_cfg=dict(type='DynamicConv2d')),
-        stage0=dict(
-            type='MutableSequential',
-            length_list=list(range(1, 3)),
-        ),
-        stage1=dict(
-            type='MutableSequential',
-            length_list=list(range(2, 4)),
-        ),
-        stage2=dict(
-            type='MutableSequential',
-            length_list=list(range(2, 4)),
-        ),
-        stage3=dict(
-            type='MutableSequential',
-            length_list=list(range(2, 5)),
-        ),
-        stage4=dict(
-            type='MutableSequential',
-            length_list=list(range(2, 7)),
-        ),
-        stage5=dict(
-            type='MutableSequential',
-            length_list=list(range(2, 7)),
-        ),
-        stage6=dict(
-            type='MutableSequential',
-            length_list=list(range(1, 3)),
-        ),
-    ))
-
-_specials = [
-    dict(in_key='expand_conv', refer='parent', expand_ratio=6),
-    dict(in_key='depthwise_conv', refer='parent', expand_ratio=1),
-    dict(in_key='se', refer='parent', expand_ratio=1)
+groups = [
+    dict(modules=[
+        'backbone.layer1.0.depthwise_conv.0',
+        'backbone.layer1.1.depthwise_conv.0'
+    ]),
+    dict(modules=[
+        'backbone.layer2.0.depthwise_conv.0',
+        'backbone.layer2.1.depthwise_conv.0',
+        'backbone.layer2.2.depthwise_conv.0'
+    ]),
+    dict(modules=[
+        'backbone.layer3.0.depthwise_conv.0',
+        'backbone.layer3.1.depthwise_conv.0',
+        'backbone.layer3.2.depthwise_conv.0'
+    ]),
+    dict(modules=[
+        'backbone.layer4.0.depthwise_conv.0',
+        'backbone.layer4.1.depthwise_conv.0',
+        'backbone.layer4.2.depthwise_conv.0',
+        'backbone.layer4.3.depthwise_conv.0'
+    ]),
+    dict(modules=[
+        'backbone.layer5.0.depthwise_conv.0',
+        'backbone.layer5.1.depthwise_conv.0',
+        'backbone.layer5.2.depthwise_conv.0',
+        'backbone.layer5.3.depthwise_conv.0',
+        'backbone.layer5.4.depthwise_conv.0',
+        'backbone.layer5.5.depthwise_conv.0'
+    ]),
+    dict(modules=[
+        'backbone.layer6.0.depthwise_conv.0',
+        'backbone.layer6.1.depthwise_conv.0',
+        'backbone.layer6.2.depthwise_conv.0',
+        'backbone.layer6.3.depthwise_conv.0',
+        'backbone.layer6.4.depthwise_conv.0',
+        'backbone.layer6.5.depthwise_conv.0'
+    ]),
+    dict(modules=[
+        'backbone.layer7.0.depthwise_conv.0',
+        'backbone.layer7.1.depthwise_conv.0'
+    ])
 ]
 
 algorithm = dict(
     type='BigNAS',
     resizer_config=dict(
         shape_list=[192, 224, 288, 320], interpolation_type='bicubic'),
-    architecture=dict(
-        type='MMClsArchitecture',
-        model=model,
-    ),
-    mutator=mutator,
+    architecture=dict(type='MMClsArchitecture', model=model),
+    mutator=dict(type='DynamicMutator', groups=groups),
     distiller=dict(
         type='SelfDistiller',
         components=[
@@ -125,42 +118,6 @@ algorithm = dict(
                     )
                 ]),
         ]),
-    retraining=False,
-    pruner=dict(
-        type='RangePruner',
-        except_start_keys=['head.layers'],
-        # TODO
-        # must be ordered
-        range_config=dict(
-            conv1=dict(
-                start_key='backbone.conv1', min_channels=32, priority=2),
-            layer1=dict(start_key='backbone.layer1', min_channels=16),
-            layer2=dict(
-                start_key='backbone.layer2',
-                min_channels=24,
-                # HACK
-                # must be ordered
-                specials=_specials),
-            layer3=dict(
-                start_key='backbone.layer3',
-                min_channels=40,
-                specials=_specials),
-            layer4=dict(
-                start_key='backbone.layer4',
-                min_channels=80,
-                specials=_specials),
-            layer5=dict(
-                start_key='backbone.layer5',
-                min_channels=112,
-                specials=_specials),
-            layer6=dict(
-                start_key='backbone.layer6',
-                min_channels=192,
-                specials=_specials),
-            layer7=dict(
-                start_key='backbone.layer7',
-                min_channels=320,
-                specials=_specials),
-            conv2=dict(start_key='backbone.conv2', min_channels=1280))))
+    retraining=False)
 
 use_ddp_wrapper = True

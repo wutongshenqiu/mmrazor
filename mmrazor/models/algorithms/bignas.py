@@ -12,7 +12,7 @@ from mmrazor.models.mutators import BigNASMutator
 from mmrazor.models.pruners import RangePruner
 from mmrazor.models.utils import add_prefix
 from mmrazor.utils import master_only_print
-from .autoslim import AutoSlim
+from .base import BaseAlgorithm
 
 
 class _InputResizer:
@@ -100,7 +100,7 @@ class _InputResizer:
 
 
 @ALGORITHMS.register_module()
-class BigNAS(AutoSlim):
+class BigNAS(BaseAlgorithm):
     pruner: RangePruner
     mutator: BigNASMutator
     distiller: SelfDistiller
@@ -112,18 +112,15 @@ class BigNAS(AutoSlim):
                  **kwargs: Any) -> None:
         # HACK
         # pruner will raise error if pruned model is not max
-        retraining = kwargs.get('retraining', False)
-        if retraining:
-            channel_cfg_path = kwargs.pop('channel_cfg')
-            channel_cfg = self.load_subnet(channel_cfg_path)
-            mutable_cfg_path = kwargs.pop('mutable_cfg')
-            mutable_cfg = self.load_subnet(mutable_cfg_path)
-        kwargs['retraining'] = False
+        # retraining = kwargs.get('retraining', False)
+        # if retraining:
+        #     channel_cfg_path = kwargs.pop('channel_cfg')
+        #     channel_cfg = self.load_subnet(channel_cfg_path)
+        #     mutable_cfg_path = kwargs.pop('mutable_cfg')
+        #     mutable_cfg = self.load_subnet(mutable_cfg_path)
+        # kwargs['retraining'] = False
+
         super().__init__(**kwargs)
-        if retraining:
-            self.retraining = True
-            self._load_subnet_config(
-                channel_cfg=channel_cfg, mutable_cfg=mutable_cfg)
 
         if not self.retraining:
             if resizer_config is None:
@@ -131,12 +128,12 @@ class BigNAS(AutoSlim):
                                  'training supernet')
             self._resizer = _InputResizer(**resizer_config)
 
-        assert self.pruner is not None, \
-            'Pruner must be configured for BigNAS!'
-        assert self.distiller is not None, \
-            'Distiller must be configured for BigNAS!'
-        assert self.mutator is not None, \
-            'Mutator must be configured for BigNAS!'
+        # assert self.pruner is not None, \
+        #     'Pruner must be configured for BigNAS!'
+        # assert self.distiller is not None, \
+        #     'Distiller must be configured for BigNAS!'
+        # assert self.mutator is not None, \
+        #     'Mutator must be configured for BigNAS!'
 
     def train_step(self, data: Dict, optimizer: torch.optim.Optimizer) -> Dict:
         """Train step function.
@@ -215,20 +212,20 @@ class BigNAS(AutoSlim):
 
     def _set_min_subnet(self) -> None:
         """set minimum subnet in current search space."""
-        self.pruner.set_min_channel()
-        self.mutator.set_min_subnet()
+        # self.pruner.set_min_channel()
+        self.mutator.set_subnet(self.mutator.min_model)
         self._resizer.set_min_shape()
 
     def _set_max_subnet(self) -> None:
         """set maximum subnet in current search space."""
-        self.pruner.set_max_channel()
-        self.mutator.set_max_subnet()
+        # self.pruner.set_max_channel()
+        self.mutator.set_subnet(self.mutator.max_model)
         self._resizer.set_max_shape()
 
     def _set_random_subnet(self) -> None:
         """set random subnet in current search space."""
-        self.pruner.set_random_channel()
-        self.mutator.set_random_subnet()
+        # self.pruner.set_random_channel()
+        self.mutator.set_subnet(self.mutator.random_model)
         self._resizer.set_random_shape()
 
     def _train_dropout(self, mode: bool = True) -> None:
@@ -236,15 +233,3 @@ class BigNAS(AutoSlim):
             if isinstance(module, Dropout):
                 master_only_print(f'set mode of `{name}` to: {mode}')
                 module.train(mode=mode)
-
-    def _load_subnet_config(self, mutable_cfg: Dict,
-                            channel_cfg: Dict) -> None:
-        if not isinstance(channel_cfg, dict):
-            raise ValueError('Type of `channel_cfg` must be dict, '
-                             f'but got: {type(channel_cfg)}')
-        if not isinstance(mutable_cfg, dict):
-            raise ValueError('Type of `mutable_cfg` must be dict, '
-                             f'but got: {type(channel_cfg)}')
-
-        self.pruner.deploy_subnet(self.architecture, channel_cfg)
-        self.mutator.deploy_subnet(self.architecture, mutable_cfg)

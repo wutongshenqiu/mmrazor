@@ -1,132 +1,33 @@
-stage_0:
-  max_sequential_length: 2
-  min_sequential_length: 1
-  sequential_length: 1
-stage_0_block_0_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 3
-  min_kernel_size: 3
-stage_0_block_1_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 3
-  min_kernel_size: 3
-stage_1:
-  max_sequential_length: 3
-  min_sequential_length: 2
-  sequential_length: 2
-stage_1_block_0_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 3
-  min_kernel_size: 3
-stage_1_block_1_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 3
-  min_kernel_size: 3
-stage_1_block_2_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 3
-  min_kernel_size: 3
-stage_2:
-  max_sequential_length: 3
-  min_sequential_length: 2
-  sequential_length: 2
-stage_2_block_0_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_2_block_1_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_2_block_2_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_3:
-  max_sequential_length: 4
-  min_sequential_length: 2
-  sequential_length: 2
-stage_3_block_0_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_3_block_1_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_3_block_2_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_3_block_3_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_4:
-  max_sequential_length: 6
-  min_sequential_length: 2
-  sequential_length: 4
-stage_4_block_0_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_4_block_1_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_4_block_2_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_4_block_3_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_4_block_4_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_4_block_5_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_5:
-  max_sequential_length: 6
-  min_sequential_length: 2
-  sequential_length: 4
-stage_5_block_0_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_5_block_1_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_5_block_2_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_5_block_3_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_5_block_4_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_5_block_5_depthwise_conv2d:
-  kernel_size: 5
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_6:
-  max_sequential_length: 2
-  min_sequential_length: 1
-  sequential_length: 1
-stage_6_block_0_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 5
-  min_kernel_size: 3
-stage_6_block_1_depthwise_conv2d:
-  kernel_size: 3
-  max_kernel_size: 5
-  min_kernel_size: 3
+backbone.layer1.0.depthwise_conv.0: 3
+backbone.layer1.1.depthwise_conv.0: 3
+backbone.layer2.0.depthwise_conv.0: 3
+backbone.layer2.1.depthwise_conv.0: 3
+backbone.layer2.2.depthwise_conv.0: 3
+backbone.layer3.0.depthwise_conv.0: 5
+backbone.layer3.1.depthwise_conv.0: 5
+backbone.layer3.2.depthwise_conv.0: 5
+backbone.layer4.0.depthwise_conv.0: 3
+backbone.layer4.1.depthwise_conv.0: 3
+backbone.layer4.2.depthwise_conv.0: 3
+backbone.layer4.3.depthwise_conv.0: 3
+backbone.layer5.0.depthwise_conv.0: 5
+backbone.layer5.1.depthwise_conv.0: 5
+backbone.layer5.2.depthwise_conv.0: 5
+backbone.layer5.3.depthwise_conv.0: 5
+backbone.layer5.4.depthwise_conv.0: 5
+backbone.layer5.5.depthwise_conv.0: 5
+backbone.layer6.0.depthwise_conv.0: 5
+backbone.layer6.1.depthwise_conv.0: 5
+backbone.layer6.2.depthwise_conv.0: 5
+backbone.layer6.3.depthwise_conv.0: 5
+backbone.layer6.4.depthwise_conv.0: 5
+backbone.layer6.5.depthwise_conv.0: 5
+backbone.layer7.0.depthwise_conv.0: 3
+backbone.layer7.1.depthwise_conv.0: 3
+backbone.layer1: 1
+backbone.layer2: 2
+backbone.layer3: 2
+backbone.layer4: 2
+backbone.layer5: 4
+backbone.layer6: 4
+backbone.layer7: 1
