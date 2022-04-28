@@ -1,68 +1,65 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from torch import Tensor, nn
+from typing import Any, Dict, Iterable, List, Optional
 
-from .mixins import DynamicMixin
+from mmcv.runner import Sequential
+from torch import Tensor
+
+from ..builder import MUTABLES
+from .base import DynamicMutable
 
 
-class DynamicSequential(DynamicMixin, nn.Sequential):
+# TODO
+# how to build?
+@MUTABLES.register_module()
+class DynamicSequential(DynamicMutable[int], Sequential):
 
-    def __init__(self, *args, dynamic_length) -> None:
-        super().__init__(*args)
-        assert isinstance(dynamic_length, (tuple, list))
-        self.dynamic_length = sorted(list(dynamic_length), reverse=True)
-        self.max_length = max(self.dynamic_length)
+    def __init__(self,
+                 *args: Any,
+                 length_list: Iterable[int],
+                 init_cfg: Optional[Dict] = None) -> None:
+        Sequential.__init__(self, *args, init_cfg=init_cfg)
 
-        self._deployed = False
-        self._choice_probs = [1 / len(self.dynamic_length)] * len(
-            self.dynamic_length)
+        self._length_list = sorted(list(set(length_list)), reverse=True)
+        assert self.max_choice == len(self), \
+            'Max length should be the length of total sequential!'
+        self.set_choice(self.max_choice)
 
-    @property
-    def choices(self):
-        return self.dynamic_length
-
-    @property
-    def num_choices(self) -> int:
-        return len(self.dynamic_length)
-
-    @property
-    def max_choice(self):
-        max_choice = len(self._modules)
-        assert max_choice == len(self._modules)
-        return max_choice
+        self._is_deployed = False
 
     @property
-    def min_choice(self):
-        return min(self.dynamic_length)
+    def current_choice(self) -> int:
+        return self._current_choice
+
+    def set_choice(self, choice: int) -> None:
+        assert choice in self.choices, \
+            f'`choice` must be in: {self.choices}, but got: {choice}'
+        self._current_choice = choice
 
     @property
-    def choice_probs(self):
-        assert sum(self._choice_probs) == 1
-        return self._choice_probs
-
-    @choice_probs.setter
-    def choice_probs(self, value):
-        self._choice_probs = value
+    def choices(self) -> List[int]:
+        return self._length_list
 
     @property
-    def deployed(self):
-        return self._deployed
+    def is_deployed(self) -> bool:
+        return self._is_deployed
 
-    @deployed.setter
-    def deployed(self, value):
-        self._deployed = value
+    def deploy_subnet(self, subnet_config: Dict) -> None:
+        if self.is_deployed:
+            return
 
-    def deploy(self, chosen):
-        for _ in range(self.max_length - chosen):
-            del self[-1]
-        self.deployed = True
+        choice = self.get_subnet_choice(subnet_config)
+        del self[choice:]
 
-    def forward_deploy(self, x):
-        return nn.Sequential.forward(self, x)
+        self._is_deployed = True
 
-    def forward_sample(self, input: Tensor, sampled=None) -> Tensor:
+    def forward_deploy(self, x: Tensor) -> Tensor:
+        return Sequential.forward(self, x)
+
+    def forward_sample(self, x: Tensor, choice: int) -> Tensor:
         for idx, module in enumerate(self):
-            if idx < sampled:
-                input = module(input)
+            if idx < choice:
+                x = module(x)
             else:
                 break
-        return input
+
+        return x

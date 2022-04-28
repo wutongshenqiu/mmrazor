@@ -1,12 +1,13 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Dict
+from typing import Dict, Optional
 
 import mmcv
 from mmcv.cnn import MODELS
 from mmcv.runner import BaseModule
 from torch.nn import Module
 
-from mmrazor.models.mutables.mixins import MutableMixin
+from mmrazor.models.mutables.base import BaseMutable
+from mmrazor.utils import master_only_print
 
 
 class BaseArchitecture(BaseModule):
@@ -17,37 +18,34 @@ class BaseArchitecture(BaseModule):
             ``DETECTOR`` in MMDetection.
     """
 
-    def __init__(self, model, mutable_cfg=None, channel_cfg=None, **kwargs):
-        super(BaseArchitecture, self).__init__(**kwargs)
-        self.model = MODELS.build(model)
-        if mutable_cfg:
+    def __init__(self,
+                 model_cfg: Dict,
+                 subnet_cfg_path: Optional[str] = None,
+                 **kwargs) -> None:
+        super().__init__(**kwargs)
 
-            mutable_cfg = mmcv.fileio.load(mutable_cfg)
-            self.deploy_subnet_mutables(self.model, mutable_cfg)
-            print(self.model)
+        self.model: Module = MODELS.build(model_cfg)
+        master_only_print(self.model)
 
-        # TODO support channel cfg
+        # TODO
+        # pruner subnet deploy
+        if subnet_cfg_path is not None:
+            subnet_cfg = mmcv.fileio.load(subnet_cfg_path)
+            self.deploy_subnet(subnet_cfg)
 
-    def deploy_subnet_mutables(self, supernet: Module,
-                               subnet_dict: Dict[str, Dict]) -> None:
-        """Export the subnet from the supernet based on the specified
-        subnet_dict.
+    def deploy_subnet(self, subnet_cfg: Dict) -> None:
+        for name, module in self.model.named_modules():
+            if isinstance(module, BaseMutable):
+                subnet_config = subnet_cfg[name]
+                module.deploy_subnet(subnet_config)
 
-        Args:
-            supernet (:obj:`torch.nn.Module`): The architecture to be used in
-                your algorithm.
-            subnet_dict (dict): Record the information to build the subnet from
-                the supernet,
-                its keys are the properties ``space_id`` of placeholders in the
-                mutator's search spaces,
-                its values are dicts: {'chosen': ['chosen name1',
-                'chosen name2', ...]}
-        """
+    def export_subnet(self) -> Dict:
+        subnet_cfg = dict()
+        for name, module in self.model.named_modulesq():
+            if isinstance(module, BaseMutable):
+                subnet_cfg[name] = module.export_subnet()
 
-        for name, module in supernet.named_modules():
-            if isinstance(module, MutableMixin):
-                chosen = subnet_dict[name]
-                module.deploy(chosen)
+        return subnet_cfg
 
     def forward_dummy(self, img):
         """Used for calculating network flops."""

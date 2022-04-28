@@ -1,10 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from abc import ABC, abstractmethod
-from typing import Any, Generic, List, TypeVar
+from typing import Any
 
 from mmcv.runner import BaseModule
-
-from mmrazor.utils import master_only_print
 
 
 class BaseOP(BaseModule):
@@ -26,35 +23,3 @@ class BaseOP(BaseModule):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.stride = stride
-
-
-CHOICE_TYPE = TypeVar('CHOICE_TYPE')
-
-
-class BaseDynamicOP(ABC, Generic[CHOICE_TYPE]):
-    choice_map_key: str
-
-    def __init__(self, choices: List[CHOICE_TYPE]) -> None:
-        self._choices = sorted(list(set(choices)))
-        master_only_print(
-            f'{type(self).__name__} with choices: {self._choices}')
-
-    @abstractmethod
-    def set_choice(self, choice: CHOICE_TYPE) -> None:
-        """Set certain choice for dynamic op.
-
-        Args:
-            choice (CHOICE_TYPE): _description_
-        """
-
-    def choices(self) -> List[CHOICE_TYPE]:
-        return self._choices
-
-    @property
-    @abstractmethod
-    def current_choice(self) -> CHOICE_TYPE:
-        """Return current active choice.
-
-        Returns:
-            CHOICE_TYPE: _description_
-        """

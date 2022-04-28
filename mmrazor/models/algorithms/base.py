@@ -58,7 +58,7 @@ class BaseAlgorithm(BaseModule):
             mutator (dict): Config for mutator, which is an algorithm component
                 for NAS.
         """
-        if mutator is None or self.retraining:
+        if mutator is None:
             self.mutator = None
             return
         self.mutator = build_mutator(mutator)

@@ -39,20 +39,20 @@ class InvertResidual(BaseModule):
         Tensor: The output tensor.
     """
 
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 stride: int,
-                 expand_ratio: int,
-                 se_cfg: Optional[Dict] = None,
-                 conv_cfg: Optional[Dict] = None,
-                 dynamic_conv_cfg: Optional[Dict] = dict(
-                     dynamic_kernel_size=(3, 5)),
-                 norm_cfg: Dict = dict(type='BN'),
-                 act_cfg: Dict = dict(type='ReLU'),
-                 drop_path_rate: float = 0.,
-                 with_cp: bool = False,
-                 **kwargs: Any):
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            stride: int,
+            expand_ratio: int,
+            se_cfg: Optional[Dict] = None,
+            conv_cfg: Optional[Dict] = None,
+            dynamic_conv_cfg: Optional[Dict] = dict(kernel_size_list=(3, 5)),
+            norm_cfg: Dict = dict(type='BN'),
+            act_cfg: Dict = dict(type='ReLU'),
+            drop_path_rate: float = 0.,
+            with_cp: bool = False,
+            **kwargs: Any):
 
         super().__init__(**kwargs)
         self.with_res_shortcut = (stride == 1 and in_channels == out_channels)
@@ -208,7 +208,7 @@ class BigNASMobileNet(BaseBackbone):
 
     # Parameters to build layers. 6 parameters are needed to construct a
     # layer, from left to right: expand_ratio, channel, max_blocks,
-    # dynamic_blocks, dynamic_kernel_size, stride.
+    # dynamic_blocks, kernel_size_list, stride.
     arch_settings = [[1, 24, 2, list(range(1, 3)), (3, ), 1],
                      [6, 32, 3, list(range(2, 4)), (3, 5), 2],
                      [6, 48, 3, list(range(2, 4)), (3, 5), 2],
@@ -217,24 +217,26 @@ class BigNASMobileNet(BaseBackbone):
                      [6, 216, 6, list(range(2, 7)), (3, 5), 2],
                      [6, 352, 2, list(range(1, 3)), (3, 5), 1]]
 
-    def __init__(
-        self,
-        first_channels: int = 40,
-        last_channels: int = 1408,
-        widen_factor: float = 1.,
-        out_indices: Tuple[int] = (7, ),
-        frozen_stages: int = -1,
-        conv_cfg: Optional[Dict] = None,
-        dynamic_conv_cfg: Optional[Dict] = dict(dynamic_kernel_size=(3, 5)),
-        norm_cfg: Dict = dict(type='BN'),
-        se_cfg: Optional[Dict] = None,
-        act_cfg: Dict = dict(type='ReLU6'),
-        norm_eval: bool = False,
-        with_cp: bool = False,
-        init_cfg: Union[Dict, List[Dict]] = [
-            dict(type='Kaiming', layer=['Conv2d']),
-            dict(type='Constant', val=1, layer=['_BatchNorm', 'GroupNorm'])
-        ]):  # noqa: E125
+    def __init__(self,
+                 first_channels: int = 40,
+                 last_channels: int = 1408,
+                 widen_factor: float = 1.,
+                 out_indices: Tuple[int] = (7, ),
+                 frozen_stages: int = -1,
+                 conv_cfg: Optional[Dict] = None,
+                 dynamic_conv_cfg: Optional[Dict] = None,
+                 norm_cfg: Dict = dict(type='BN'),
+                 se_cfg: Optional[Dict] = None,
+                 act_cfg: Dict = dict(type='ReLU6'),
+                 norm_eval: bool = False,
+                 with_cp: bool = False,
+                 init_cfg: Union[Dict, List[Dict]] = [
+                     dict(type='Kaiming', layer=['Conv2d']),
+                     dict(
+                         type='Constant',
+                         val=1,
+                         layer=['_BatchNorm', 'GroupNorm'])
+                 ]):  # noqa: E125
         super().__init__(init_cfg)
 
         self.widen_factor = widen_factor
@@ -273,15 +275,15 @@ class BigNASMobileNet(BaseBackbone):
 
         for i, layer_cfg in enumerate(self.arch_settings):
             expand_ratio, channel, num_blocks, \
-                dynamic_blocks, dynamic_kernel_size, stride = layer_cfg
+                dynamic_blocks, kernel_size_list, stride = layer_cfg
             out_channels = make_divisible(channel * widen_factor, 8)
             inverted_res_layer = self.make_layer(
                 out_channels=out_channels,
                 num_blocks=num_blocks,
                 stride=stride,
                 expand_ratio=expand_ratio,
-                dynamic_blokcs=dynamic_blocks,
-                dynamic_kernel_size=dynamic_kernel_size)
+                length_list=dynamic_blocks,
+                kernel_size_list=kernel_size_list)
 
             layer_name = f'layer{i + 1}'
             self.add_module(layer_name, inverted_res_layer)
@@ -305,7 +307,7 @@ class BigNASMobileNet(BaseBackbone):
         self.layers.append('conv2')
 
     def make_layer(self, out_channels: int, num_blocks: int,
-                   dynamic_blokcs: list, dynamic_kernel_size: list,
+                   length_list: List[int], kernel_size_list: List[int],
                    stride: int, expand_ratio: int) -> Module:
         """Stack InvertedResidual blocks to build a layer for MobileNetV2.
 
@@ -317,7 +319,7 @@ class BigNASMobileNet(BaseBackbone):
                 hidden layer in InvertedResidual by this ratio. Default: 6.
         """
         layers = []
-        dynamic_conv_cfg = dict(dynamic_kernel_size=dynamic_kernel_size)
+        dynamic_conv_cfg = dict(kernel_size_list=kernel_size_list)
         for i in range(num_blocks):
             if i >= 1:
                 stride = 1
@@ -337,7 +339,7 @@ class BigNASMobileNet(BaseBackbone):
 
             self.in_channels = out_channels
 
-        return DynamicSequential(*layers, dynamic_length=dynamic_blokcs)
+        return DynamicSequential(*layers, length_list=length_list)
 
     def forward(self, x):
         """Forward computation.

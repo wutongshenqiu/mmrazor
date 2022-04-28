@@ -8,7 +8,7 @@ from torch.nn import Dropout, functional
 from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import ALGORITHMS
 from mmrazor.models.distillers import SelfDistiller
-from mmrazor.models.mutators import BigNASMutator
+from mmrazor.models.mutators import DynamicMutator
 from mmrazor.models.pruners import RangePruner
 from mmrazor.models.utils import add_prefix
 from mmrazor.utils import master_only_print
@@ -102,7 +102,7 @@ class _InputResizer:
 @ALGORITHMS.register_module()
 class BigNAS(BaseAlgorithm):
     pruner: RangePruner
-    mutator: BigNASMutator
+    mutator: DynamicMutator
     distiller: SelfDistiller
     num_sample_training: int
     architecture: BaseArchitecture
@@ -213,19 +213,19 @@ class BigNAS(BaseAlgorithm):
     def _set_min_subnet(self) -> None:
         """set minimum subnet in current search space."""
         # self.pruner.set_min_channel()
-        self.mutator.set_subnet(self.mutator.min_model)
+        self.mutator.set_subnet(self.mutator.min_subnet)
         self._resizer.set_min_shape()
 
     def _set_max_subnet(self) -> None:
         """set maximum subnet in current search space."""
         # self.pruner.set_max_channel()
-        self.mutator.set_subnet(self.mutator.max_model)
+        self.mutator.set_subnet(self.mutator.max_subnet)
         self._resizer.set_max_shape()
 
     def _set_random_subnet(self) -> None:
         """set random subnet in current search space."""
         # self.pruner.set_random_channel()
-        self.mutator.set_subnet(self.mutator.random_model)
+        self.mutator.set_subnet(self.mutator.random_subnet)
         self._resizer.set_random_shape()
 
     def _train_dropout(self, mode: bool = True) -> None:

@@ -173,6 +173,9 @@ def main():
     algorithm = build_algorithm(cfg.algorithm)
     algorithm.init_weights()
 
+    import pdb
+    pdb.set_trace()
+
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)

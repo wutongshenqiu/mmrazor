@@ -1,182 +1,105 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Tuple
+from typing import Dict, Iterable, List, Tuple
 
 import torch
 from torch import Tensor, nn
+from torch.nn import Conv2d
 from torch.nn import functional as F
 
-from mmrazor.models.builder import build_op
 from mmrazor.utils import master_only_print
-from .mixins import DiffentiableMixin, DynamicMixin, OneShotMixin
+from ..builder import MUTABLES
+from .base import DynamicMutable
 
 
-class OneShotOP(nn.Module, OneShotMixin):
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.candidate_ops = nn.ModuleDict()
-
-    def init_ops(self, ops):
-        for name, op_cfg in ops.items():
-            assert name not in self.candidate_ops
-            self.candidate_ops[name] = build_op(op_cfg)
-
-    @property
-    def choices(self):
-        return self.candidate_ops.keys()
-
-    def deploy(self, chosen):
-
-        for name in self.choices:
-            if name != chosen:
-                self.candidate_ops.pop(name)
-        self.deployed = True
-
-    def forward(self, x, sampled=None):
-        if self.deployed:
-            assert sampled is None
-            return self.forward_deploy(x)
-        elif sampled:
-            return self.forward_sample(x, sampled)
-
-    def forward_deploy(self, x):
-        assert self.num_choices == 1
-        chosen = self.choices[0]
-        return self.candidate_ops[chosen](x)
-
-    def forward_sample(self, x, sampled):
-        return self.candidate_ops[sampled](x)
-
-
-class DifferentiableOP(nn.Module, DiffentiableMixin):
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.candidate_ops = nn.ModuleDict()
-
-    def init_ops(self, ops):
-        for name, op_cfg in ops.items():
-            assert name not in self.candidate_ops
-            self.candidate_ops[name] = build_op(op_cfg)
-
-    @property
-    def choices(self):
-        return self.candidate_ops.keys()
-
-    @property
-    def num_choices(self):
-        return len(self.candidate_ops.keys())
-
-    def deploy(self, chosen):
-
-        for name in self.choices:
-            if name != chosen:
-                self.candidate_ops.pop(name)
-        self.deployed = True
-
-    def forward(self, x, arch_params=None):
-        if self.deployed:
-            assert arch_params is None
-            return self.forward_deploy(x)
-        elif arch_params:
-            return self.forward_train(x, arch_params)
-
-    def forward_deploy(self, x):
-        assert self.num_choices == 1
-        chosen = self.choices[0]
-        return self.candidate_ops[chosen](x)
-
-    def forward_train(self, x, arch_params):
-
-        probs = F.softmax(arch_params, dim=-1)
-        outputs = [op(x) for op in self.candidate_ops.values()]
-        outputs = [o * p for o, p in zip(outputs, probs)]
-
-        return sum(outputs)
-
-
-class DynamicKernelConv2d(DynamicMixin, nn.Conv2d):
+@MUTABLES.register_module()
+class DynamicKernelConv2d(DynamicMutable[int], Conv2d):
 
     def __init__(self,
-                 in_channels,
-                 out_channels,
-                 dynamic_kernel_size,
-                 stride=1,
-                 padding_mode='same',
-                 dilation=1,
-                 groups=1,
-                 bias=True):
-        super().__init__(in_channels, out_channels, max(dynamic_kernel_size),
-                         stride, 0, dilation, groups, bias)
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size_list: Iterable[int],
+                 stride: int = 1,
+                 padding: int = 0,
+                 padding_mode: str = 'zeros',
+                 dilation: int = 1,
+                 groups: int = 1,
+                 bias: bool = True) -> None:
+        kernel_size_list = sorted(list(set(kernel_size_list)), reverse=True)
+        self._kernel_size_list = kernel_size_list
+        self.set_choice(self.max_choice)
 
-        self.dynamic_kernel_size = sorted(
-            list(dynamic_kernel_size), reverse=True)
-        self._max_kernel_size = max(self.dynamic_kernel_size)
+        Conv2d.__init__(
+            self=self,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=self.max_choice,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+            padding_mode=padding_mode)
 
-        for i in range(len(self.dynamic_kernel_size) - 1):
-            source_kernel_size = self.dynamic_kernel_size[i]
-            target_kernel_size = self.dynamic_kernel_size[i + 1]
+        transform_matrix_name_list = []
+        for i in range(self.num_choices - 1):
+            source_kernel_size = self.choices[i]
+            target_kernel_size = self.choices[i + 1]
             transform_matrix_name = self._get_transform_matrix_name(
                 src=source_kernel_size, tar=target_kernel_size)
+            transform_matrix_name_list.append(transform_matrix_name)
             self.register_parameter(
                 name=transform_matrix_name,
                 param=nn.Parameter(torch.eye(target_kernel_size**2)))
+        self._transform_matrix_name_list = transform_matrix_name_list
 
-        self._deployed = False
-        self._choice_probs = [1 / len(self.dynamic_kernel_size)] * len(
-            self.dynamic_kernel_size)
-
-    @property
-    def num_choices(self) -> int:
-        return len(self.dynamic_kernel_size)
+        self._is_deployed = False
 
     @property
-    def min_choice(self):
-        return self.choices[-1]
+    def is_deployed(self) -> bool:
+        return self._is_deployed
 
     @property
-    def max_choice(self):
-        return self.choices[0]
+    def choices(self) -> List[int]:
+        return self._kernel_size_list
 
     @property
-    def choice_probs(self):
-        assert sum(self._choice_probs) == 1
-        return self._choice_probs
+    def current_choice(self) -> int:
+        return self._current_choice
 
-    @choice_probs.setter
-    def choice_probs(self, value):
-        self._choice_probs = value
+    def set_choice(self, choice: int) -> None:
+        assert choice in self.choices, \
+            f'`choice` must be in: {self.choices}, but got: {choice}'
+        self._current_choice = choice
 
-    @property
-    def deployed(self):
-        return self._deployed
+    @torch.no_grad()
+    def deploy_subnet(self, subnet_config: Dict) -> None:
+        if self.is_deployed:
+            # TODO
+            # warning
+            return
 
-    @deployed.setter
-    def deployed(self, value):
-        self._deployed = value
-
-    @property
-    def choices(self):
-        # TODO verify sorted
-        return self.dynamic_kernel_size
-
-    def deploy(self, chosen):
-        weight = self._get_weight(chosen)
-        padding = self._get_padding(chosen)
+        choice = self.get_subnet_choice(subnet_config)
+        weight = self._get_weight(choice)
+        padding = self._get_padding(choice)
         self.weight = nn.Parameter(weight)
-        self.padding = (padding, padding)
-        self.deployed = True
+        self.padding = padding
 
-    def forward_deploy(self, x):
-        # import pdb;pdb.set_trace()
-        return nn.Conv2d.forward(self, x)
+        for transform_matrix_name in self._transform_matrix_name_list:
+            delattr(self, transform_matrix_name)
+            master_only_print(
+                f'delete transform matrix: {transform_matrix_name}')
 
-    def forward_sample(self, input: Tensor, sampled=None) -> Tensor:
-        weight = self._get_weight(sampled)
-        padding = self._get_padding(sampled)
+        self._is_deployed = True
+
+    def forward_deploy(self, x: Tensor) -> Tensor:
+        return Conv2d.forward(self, x)
+
+    def forward_sample(self, x: Tensor, choice: int) -> Tensor:
+        weight = self._get_weight(choice)
+        padding = self._get_padding(choice)
 
         return F.conv2d(
-            input=input,
+            input=x,
             weight=weight,
             bias=self.bias,
             stride=self.stride,
@@ -188,12 +111,12 @@ class DynamicKernelConv2d(DynamicMixin, nn.Conv2d):
     def _get_transform_matrix_name(src: int, tar: int) -> str:
         return f'transform_matrix_{src}to{tar}'
 
-    def _get_weight(self, kernel_size) -> torch.Tensor:
-        if kernel_size == self._max_kernel_size:
+    def _get_weight(self, kernel_size: int) -> torch.Tensor:
+        if kernel_size == self.max_choice:
             return self.weight
 
         current_weight = self.weight[:, :, :, :]
-        for i in range(len(self.choices) - 1):
+        for i in range(self.num_choices - 1):
             source_kernel_size = self.choices[i]
             if source_kernel_size <= kernel_size:
                 break
@@ -235,5 +158,6 @@ class DynamicKernelConv2d(DynamicMixin, nn.Conv2d):
 
         return start_offset, end_offset
 
-    def _get_padding(self, kernel_size) -> int:
+    @staticmethod
+    def _get_padding(kernel_size: int) -> int:
         return kernel_size >> 1

@@ -32,7 +32,7 @@ se_cfg = dict(
                  type='HSigmoid', bias=3, divisor=6, min_value=0,
                  max_value=1)))
 norm_cfg = dict(type='BN')
-model = dict(
+model_cfg = dict(
     type='mmcls.ImageClassifier',
     backbone=dict(
         type='BigNASMobileNet',
@@ -54,7 +54,7 @@ model = dict(
             type='Normal', layer='Linear', mean=0., std=0.01, bias=0.),
         topk=(1, 5)))
 
-groups = [
+search_groups = [
     dict(modules=[
         'backbone.layer1.0.depthwise_conv.0',
         'backbone.layer1.1.depthwise_conv.0'
@@ -101,8 +101,8 @@ algorithm = dict(
     type='BigNAS',
     resizer_config=dict(
         shape_list=[192, 224, 288, 320], interpolation_type='bicubic'),
-    architecture=dict(type='MMClsArchitecture', model=model),
-    mutator=dict(type='DynamicMutator', groups=groups),
+    architecture=dict(type='MMClsArchitecture', model_cfg=model_cfg),
+    mutator=dict(type='DynamicMutator', search_groups=search_groups),
     distiller=dict(
         type='SelfDistiller',
         components=[

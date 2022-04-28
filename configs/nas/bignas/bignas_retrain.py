@@ -1,10 +1,6 @@
 _base_ = ['./bignas.py']
 
-algorithm = dict(
-    architecture=dict(
-        mutable_cfg='configs/nas/bignas/bignas_M_mutator_cfg.yaml'),
-    distiller=None,
-    retraining=True)
+algorithm = dict(retraining=True)
 
 _samples_per_gpu = 96
 _number_of_gpus = 8
