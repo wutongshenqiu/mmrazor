@@ -1,7 +1,8 @@
 _base_ = [
-    '../../_base_/mmcls_runtime.py'
-    '../../_base_/datasets/pipelines/rand_aug.py',
-    '../../_base_/schedules/mmcls/imagenet_bs1024_aa_bignas.py',
+    '../../_base_/mmcls_runtime.py',
+    # FIXME
+    # strange path
+    '../../_base_/datasets/mmcls/pipelines/rand_aug.py',
 ]
 
 _samples_per_gpu = 512
@@ -80,9 +81,20 @@ data = dict(
         ann_file='data/imagenet/meta/val.txt',
         pipeline=test_pipeline))
 
-optimizer = dict(lr=_initial_lr)
+optimizer = dict(
+    type='RMSpropTF',
+    lr=_initial_lr,
+    eps=0.001,
+    weight_decay=1e-5,
+    momentum=0.9)
+optimizer_config = None
 lr_config = dict(
+    policy='Step',
+    by_epoch=False,
     step=int(_iterations_per_epoch * 2.4),
+    gamma=0.97,
+    warmup='linear',
+    warmup_by_epoch=False,
     warmup_iters=_iterations_per_epoch * 3,
     warmup_ratio=1e-6 / _initial_lr,
     min_lr=_min_lr)
@@ -227,4 +239,3 @@ algorithm = dict(
     is_supernet_training=False)
 
 use_ddp_wrapper = True
-optimizer_config = None

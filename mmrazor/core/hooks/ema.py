@@ -2,10 +2,11 @@
 import math
 
 from mmcv.parallel import is_module_wrapper
-from mmcv.runner.hooks import MMCV_HOOKS, Hook
+from mmcv.runner.hooks import HOOKS as MMCV_HOOKS
+from mmcv.runner.hooks import Hook
 from mmcv.utils import Registry
 
-MMRAZOR_HOOKS = Registry('hooks', parent=MMCV_HOOKS)
+MMRAZOR_HOOKS = Registry('mmrazor hooks', parent=MMCV_HOOKS)
 
 
 class BaseEMAHook(Hook):
