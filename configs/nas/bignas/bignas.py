@@ -4,12 +4,12 @@ _base_ = [
     '../../_base_/mmcls_runtime.py'
 ]
 
-_samples_per_gpu = 96
+_samples_per_gpu = 512
 _number_of_gpus = 8
 _batch_size = _samples_per_gpu * _number_of_gpus
 
 _train_dataset_size = 1281167
-_iterations_per_epoch = (_train_dataset_size / _batch_size).__ceil__()
+_iterations_per_epoch = int(_train_dataset_size / _batch_size)
 
 _initial_lr = (0.256 / 4096) * (_batch_size)
 _min_lr = _initial_lr * 0.05
@@ -22,8 +22,11 @@ lr_config = dict(
     warmup_ratio=1e-6 / _initial_lr,
     min_lr=_min_lr)
 runner = dict(type='IterBasedRunner', max_iters=450 * _iterations_per_epoch)
-checkpoint_config = dict(interval=20000, max_keep_ckpts=5)
-evaluation = dict(interval=5000, metric='accuracy')
+checkpoint_config = dict(interval=10000, max_keep_ckpts=5)
+evaluation = dict(interval=2000, metric='accuracy')
+custom_hooks = [
+    dict(type='mmrazor.LinearMomentumEMAHook', momentum=0.0001, priority=49)
+]
 
 se_cfg = dict(
     ratio=4,
@@ -53,6 +56,38 @@ model_cfg = dict(
         init_cfg=dict(
             type='Normal', layer='Linear', mean=0., std=0.01, bias=0.),
         topk=(1, 5)))
+
+_specials = [
+    dict(in_key='expand_conv', refer='parent', expand_ratio=6),
+    dict(in_key='depthwise_conv', refer='parent', expand_ratio=1),
+    dict(in_key='se', refer='parent', expand_ratio=1)
+]
+
+pruner = dict(
+    type='RangePruner',
+    except_start_keys=['head._layers'],
+    # TODO
+    # must be ordered
+    range_config=dict(
+        conv1=dict(start_key='backbone.conv1', min_channels=32, priority=2),
+        layer1=dict(start_key='backbone.layer1', min_channels=16),
+        layer2=dict(
+            start_key='backbone.layer2',
+            min_channels=24,
+            # HACK
+            # must be ordered
+            specials=_specials),
+        layer3=dict(
+            start_key='backbone.layer3', min_channels=40, specials=_specials),
+        layer4=dict(
+            start_key='backbone.layer4', min_channels=80, specials=_specials),
+        layer5=dict(
+            start_key='backbone.layer5', min_channels=112, specials=_specials),
+        layer6=dict(
+            start_key='backbone.layer6', min_channels=192, specials=_specials),
+        layer7=dict(
+            start_key='backbone.layer7', min_channels=320, specials=_specials),
+        conv2=dict(start_key='backbone.conv2', min_channels=1280)))
 
 search_groups = [
     dict(modules=[
@@ -103,6 +138,7 @@ algorithm = dict(
         shape_list=[192, 224, 288, 320], interpolation_type='bicubic'),
     architecture=dict(type='MMClsArchitecture', model_cfg=model_cfg),
     mutator=dict(type='DynamicMutator', search_groups=search_groups),
+    pruner=pruner,
     distiller=dict(
         type='SelfDistiller',
         components=[
@@ -118,6 +154,7 @@ algorithm = dict(
                     )
                 ]),
         ]),
-    retraining=False)
+    is_supernet_training=False)
 
 use_ddp_wrapper = True
+optimizer_config = None

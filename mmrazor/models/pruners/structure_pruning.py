@@ -13,6 +13,7 @@ from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import PRUNERS
+from mmrazor.utils import master_only_print
 from .utils import SwitchableBatchNorm2d
 
 # These grad_fn pattern are flags of specific a nn.Module
@@ -538,6 +539,8 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
             channels_per_layer = channel_cfg[name]
             requires_grad = module.weight.requires_grad
             out_channels = channels_per_layer['out_channels']
+            master_only_print(
+                f'module: {name}, deploy out channels: {out_channels}')
             temp_weight = module.weight.data[:out_channels]
 
             if hasattr(module, 'out_channels'):
@@ -551,6 +554,8 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
 
             if 'in_channels' in channels_per_layer:
                 in_channels = channels_per_layer['in_channels']
+                master_only_print(
+                    f'module {name}, deploy in channels: {in_channels}')
 
                 # can also handle depthwise conv
                 temp_weight = temp_weight[:, :in_channels].data

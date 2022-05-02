@@ -1,0 +1,170 @@
+backbone.layer1:
+  all_choices:
+  - 2
+  - 1
+  subnet_choice: 1
+backbone.layer1.0.depthwise_conv.0:
+  all_choices:
+  - 3
+  subnet_choice: 3
+backbone.layer1.1.depthwise_conv.0:
+  all_choices:
+  - 3
+  subnet_choice: 3
+backbone.layer2:
+  all_choices:
+  - 3
+  - 2
+  subnet_choice: 2
+backbone.layer2.0.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3
+backbone.layer2.1.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3
+backbone.layer2.2.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3
+backbone.layer3:
+  all_choices:
+  - 3
+  - 2
+  subnet_choice: 2
+backbone.layer3.0.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer3.1.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer3.2.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer4:
+  all_choices:
+  - 4
+  - 3
+  - 2
+  subnet_choice: 2
+backbone.layer4.0.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3
+backbone.layer4.1.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3
+backbone.layer4.2.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3
+backbone.layer4.3.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3
+backbone.layer5:
+  all_choices:
+  - 6
+  - 5
+  - 4
+  - 3
+  - 2
+  subnet_choice: 2
+backbone.layer5.0.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer5.1.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer5.2.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer5.3.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer5.4.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer5.5.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer6:
+  all_choices:
+  - 6
+  - 5
+  - 4
+  - 3
+  - 2
+  subnet_choice: 3
+backbone.layer6.0.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer6.1.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer6.2.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer6.3.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer6.4.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer6.5.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 5
+backbone.layer7:
+  all_choices:
+  - 2
+  - 1
+  subnet_choice: 1
+backbone.layer7.0.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3
+backbone.layer7.1.depthwise_conv.0:
+  all_choices:
+  - 5
+  - 3
+  subnet_choice: 3

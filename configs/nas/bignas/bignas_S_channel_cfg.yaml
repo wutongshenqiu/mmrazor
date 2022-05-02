@@ -1,0 +1,455 @@
+backbone.conv1.bn:
+  out_channels: 32
+  raw_out_channels: 40
+backbone.conv1.conv:
+  in_channels: 3
+  out_channels: 32
+  raw_in_channels: 3
+  raw_out_channels: 40
+backbone.conv2.bn:
+  out_channels: 1280
+  raw_out_channels: 1408
+backbone.conv2.conv:
+  in_channels: 320
+  out_channels: 1280
+  raw_in_channels: 352
+  raw_out_channels: 1408
+backbone.layer1.0.depthwise_conv.0:
+  in_channels: 32
+  out_channels: 32
+  raw_in_channels: 40
+  raw_out_channels: 40
+backbone.layer1.0.depthwise_conv.1:
+  out_channels: 32
+  raw_out_channels: 40
+backbone.layer1.0.linear_conv.bn:
+  out_channels: 16
+  raw_out_channels: 24
+backbone.layer1.0.linear_conv.conv:
+  in_channels: 32
+  out_channels: 16
+  raw_in_channels: 40
+  raw_out_channels: 24
+backbone.layer1.0.se.conv1.conv:
+  in_channels: 32
+  out_channels: 16
+  raw_in_channels: 40
+  raw_out_channels: 16
+backbone.layer1.0.se.conv2.conv:
+  in_channels: 16
+  out_channels: 32
+  raw_in_channels: 16
+  raw_out_channels: 40
+backbone.layer2.0.depthwise_conv.0:
+  in_channels: 96
+  out_channels: 96
+  raw_in_channels: 144
+  raw_out_channels: 144
+backbone.layer2.0.depthwise_conv.1:
+  out_channels: 96
+  raw_out_channels: 144
+backbone.layer2.0.expand_conv.bn:
+  out_channels: 96
+  raw_out_channels: 144
+backbone.layer2.0.expand_conv.conv:
+  in_channels: 16
+  out_channels: 96
+  raw_in_channels: 24
+  raw_out_channels: 144
+backbone.layer2.0.linear_conv.bn:
+  out_channels: 24
+  raw_out_channels: 32
+backbone.layer2.0.linear_conv.conv:
+  in_channels: 96
+  out_channels: 24
+  raw_in_channels: 144
+  raw_out_channels: 32
+backbone.layer2.0.se.conv1.conv:
+  in_channels: 96
+  out_channels: 40
+  raw_in_channels: 144
+  raw_out_channels: 40
+backbone.layer2.0.se.conv2.conv:
+  in_channels: 40
+  out_channels: 96
+  raw_in_channels: 40
+  raw_out_channels: 144
+backbone.layer2.1.depthwise_conv.0:
+  in_channels: 144
+  out_channels: 144
+  raw_in_channels: 192
+  raw_out_channels: 192
+backbone.layer2.1.depthwise_conv.1:
+  out_channels: 144
+  raw_out_channels: 192
+backbone.layer2.1.expand_conv.bn:
+  out_channels: 144
+  raw_out_channels: 192
+backbone.layer2.1.expand_conv.conv:
+  in_channels: 24
+  out_channels: 144
+  raw_in_channels: 32
+  raw_out_channels: 192
+backbone.layer2.1.linear_conv.bn:
+  out_channels: 24
+  raw_out_channels: 32
+backbone.layer2.1.linear_conv.conv:
+  in_channels: 144
+  out_channels: 24
+  raw_in_channels: 192
+  raw_out_channels: 32
+backbone.layer2.1.se.conv1.conv:
+  in_channels: 144
+  out_channels: 48
+  raw_in_channels: 192
+  raw_out_channels: 48
+backbone.layer2.1.se.conv2.conv:
+  in_channels: 48
+  out_channels: 144
+  raw_in_channels: 48
+  raw_out_channels: 192
+backbone.layer3.0.depthwise_conv.0:
+  in_channels: 144
+  out_channels: 144
+  raw_in_channels: 192
+  raw_out_channels: 192
+backbone.layer3.0.depthwise_conv.1:
+  out_channels: 144
+  raw_out_channels: 192
+backbone.layer3.0.expand_conv.bn:
+  out_channels: 144
+  raw_out_channels: 192
+backbone.layer3.0.expand_conv.conv:
+  in_channels: 24
+  out_channels: 144
+  raw_in_channels: 32
+  raw_out_channels: 192
+backbone.layer3.0.linear_conv.bn:
+  out_channels: 40
+  raw_out_channels: 48
+backbone.layer3.0.linear_conv.conv:
+  in_channels: 144
+  out_channels: 40
+  raw_in_channels: 192
+  raw_out_channels: 48
+backbone.layer3.0.se.conv1.conv:
+  in_channels: 144
+  out_channels: 48
+  raw_in_channels: 192
+  raw_out_channels: 48
+backbone.layer3.0.se.conv2.conv:
+  in_channels: 48
+  out_channels: 144
+  raw_in_channels: 48
+  raw_out_channels: 192
+backbone.layer3.1.depthwise_conv.0:
+  in_channels: 240
+  out_channels: 240
+  raw_in_channels: 288
+  raw_out_channels: 288
+backbone.layer3.1.depthwise_conv.1:
+  out_channels: 240
+  raw_out_channels: 288
+backbone.layer3.1.expand_conv.bn:
+  out_channels: 240
+  raw_out_channels: 288
+backbone.layer3.1.expand_conv.conv:
+  in_channels: 40
+  out_channels: 240
+  raw_in_channels: 48
+  raw_out_channels: 288
+backbone.layer3.1.linear_conv.bn:
+  out_channels: 40
+  raw_out_channels: 48
+backbone.layer3.1.linear_conv.conv:
+  in_channels: 240
+  out_channels: 40
+  raw_in_channels: 288
+  raw_out_channels: 48
+backbone.layer3.1.se.conv1.conv:
+  in_channels: 240
+  out_channels: 72
+  raw_in_channels: 288
+  raw_out_channels: 72
+backbone.layer3.1.se.conv2.conv:
+  in_channels: 72
+  out_channels: 240
+  raw_in_channels: 72
+  raw_out_channels: 288
+backbone.layer4.0.depthwise_conv.0:
+  in_channels: 240
+  out_channels: 240
+  raw_in_channels: 288
+  raw_out_channels: 288
+backbone.layer4.0.depthwise_conv.1:
+  out_channels: 240
+  raw_out_channels: 288
+backbone.layer4.0.expand_conv.bn:
+  out_channels: 240
+  raw_out_channels: 288
+backbone.layer4.0.expand_conv.conv:
+  in_channels: 40
+  out_channels: 240
+  raw_in_channels: 48
+  raw_out_channels: 288
+backbone.layer4.0.linear_conv.bn:
+  out_channels: 80
+  raw_out_channels: 88
+backbone.layer4.0.linear_conv.conv:
+  in_channels: 240
+  out_channels: 80
+  raw_in_channels: 288
+  raw_out_channels: 88
+backbone.layer4.0.se.conv1.conv:
+  in_channels: 240
+  out_channels: 72
+  raw_in_channels: 288
+  raw_out_channels: 72
+backbone.layer4.0.se.conv2.conv:
+  in_channels: 72
+  out_channels: 240
+  raw_in_channels: 72
+  raw_out_channels: 288
+backbone.layer4.1.depthwise_conv.0:
+  in_channels: 480
+  out_channels: 480
+  raw_in_channels: 528
+  raw_out_channels: 528
+backbone.layer4.1.depthwise_conv.1:
+  out_channels: 480
+  raw_out_channels: 528
+backbone.layer4.1.expand_conv.bn:
+  out_channels: 480
+  raw_out_channels: 528
+backbone.layer4.1.expand_conv.conv:
+  in_channels: 80
+  out_channels: 480
+  raw_in_channels: 88
+  raw_out_channels: 528
+backbone.layer4.1.linear_conv.bn:
+  out_channels: 80
+  raw_out_channels: 88
+backbone.layer4.1.linear_conv.conv:
+  in_channels: 480
+  out_channels: 80
+  raw_in_channels: 528
+  raw_out_channels: 88
+backbone.layer4.1.se.conv1.conv:
+  in_channels: 480
+  out_channels: 136
+  raw_in_channels: 528
+  raw_out_channels: 136
+backbone.layer4.1.se.conv2.conv:
+  in_channels: 136
+  out_channels: 480
+  raw_in_channels: 136
+  raw_out_channels: 528
+backbone.layer5.0.depthwise_conv.0:
+  in_channels: 480
+  out_channels: 480
+  raw_in_channels: 528
+  raw_out_channels: 528
+backbone.layer5.0.depthwise_conv.1:
+  out_channels: 480
+  raw_out_channels: 528
+backbone.layer5.0.expand_conv.bn:
+  out_channels: 480
+  raw_out_channels: 528
+backbone.layer5.0.expand_conv.conv:
+  in_channels: 80
+  out_channels: 480
+  raw_in_channels: 88
+  raw_out_channels: 528
+backbone.layer5.0.linear_conv.bn:
+  out_channels: 112
+  raw_out_channels: 128
+backbone.layer5.0.linear_conv.conv:
+  in_channels: 480
+  out_channels: 112
+  raw_in_channels: 528
+  raw_out_channels: 128
+backbone.layer5.0.se.conv1.conv:
+  in_channels: 480
+  out_channels: 136
+  raw_in_channels: 528
+  raw_out_channels: 136
+backbone.layer5.0.se.conv2.conv:
+  in_channels: 136
+  out_channels: 480
+  raw_in_channels: 136
+  raw_out_channels: 528
+backbone.layer5.1.depthwise_conv.0:
+  in_channels: 672
+  out_channels: 672
+  raw_in_channels: 768
+  raw_out_channels: 768
+backbone.layer5.1.depthwise_conv.1:
+  out_channels: 672
+  raw_out_channels: 768
+backbone.layer5.1.expand_conv.bn:
+  out_channels: 672
+  raw_out_channels: 768
+backbone.layer5.1.expand_conv.conv:
+  in_channels: 112
+  out_channels: 672
+  raw_in_channels: 128
+  raw_out_channels: 768
+backbone.layer5.1.linear_conv.bn:
+  out_channels: 112
+  raw_out_channels: 128
+backbone.layer5.1.linear_conv.conv:
+  in_channels: 672
+  out_channels: 112
+  raw_in_channels: 768
+  raw_out_channels: 128
+backbone.layer5.1.se.conv1.conv:
+  in_channels: 672
+  out_channels: 192
+  raw_in_channels: 768
+  raw_out_channels: 192
+backbone.layer5.1.se.conv2.conv:
+  in_channels: 192
+  out_channels: 672
+  raw_in_channels: 192
+  raw_out_channels: 768
+backbone.layer6.0.depthwise_conv.0:
+  in_channels: 672
+  out_channels: 672
+  raw_in_channels: 768
+  raw_out_channels: 768
+backbone.layer6.0.depthwise_conv.1:
+  out_channels: 672
+  raw_out_channels: 768
+backbone.layer6.0.expand_conv.bn:
+  out_channels: 672
+  raw_out_channels: 768
+backbone.layer6.0.expand_conv.conv:
+  in_channels: 112
+  out_channels: 672
+  raw_in_channels: 128
+  raw_out_channels: 768
+backbone.layer6.0.linear_conv.bn:
+  out_channels: 192
+  raw_out_channels: 216
+backbone.layer6.0.linear_conv.conv:
+  in_channels: 672
+  out_channels: 192
+  raw_in_channels: 768
+  raw_out_channels: 216
+backbone.layer6.0.se.conv1.conv:
+  in_channels: 672
+  out_channels: 192
+  raw_in_channels: 768
+  raw_out_channels: 192
+backbone.layer6.0.se.conv2.conv:
+  in_channels: 192
+  out_channels: 672
+  raw_in_channels: 192
+  raw_out_channels: 768
+backbone.layer6.1.depthwise_conv.0:
+  in_channels: 1152
+  out_channels: 1152
+  raw_in_channels: 1296
+  raw_out_channels: 1296
+backbone.layer6.1.depthwise_conv.1:
+  out_channels: 1152
+  raw_out_channels: 1296
+backbone.layer6.1.expand_conv.bn:
+  out_channels: 1152
+  raw_out_channels: 1296
+backbone.layer6.1.expand_conv.conv:
+  in_channels: 192
+  out_channels: 1152
+  raw_in_channels: 216
+  raw_out_channels: 1296
+backbone.layer6.1.linear_conv.bn:
+  out_channels: 192
+  raw_out_channels: 216
+backbone.layer6.1.linear_conv.conv:
+  in_channels: 1152
+  out_channels: 192
+  raw_in_channels: 1296
+  raw_out_channels: 216
+backbone.layer6.1.se.conv1.conv:
+  in_channels: 1152
+  out_channels: 328
+  raw_in_channels: 1296
+  raw_out_channels: 328
+backbone.layer6.1.se.conv2.conv:
+  in_channels: 328
+  out_channels: 1152
+  raw_in_channels: 328
+  raw_out_channels: 1296
+backbone.layer6.2.depthwise_conv.0:
+  in_channels: 1152
+  out_channels: 1152
+  raw_in_channels: 1296
+  raw_out_channels: 1296
+backbone.layer6.2.depthwise_conv.1:
+  out_channels: 1152
+  raw_out_channels: 1296
+backbone.layer6.2.expand_conv.bn:
+  out_channels: 1152
+  raw_out_channels: 1296
+backbone.layer6.2.expand_conv.conv:
+  in_channels: 192
+  out_channels: 1152
+  raw_in_channels: 216
+  raw_out_channels: 1296
+backbone.layer6.2.linear_conv.bn:
+  out_channels: 192
+  raw_out_channels: 216
+backbone.layer6.2.linear_conv.conv:
+  in_channels: 1152
+  out_channels: 192
+  raw_in_channels: 1296
+  raw_out_channels: 216
+backbone.layer6.2.se.conv1.conv:
+  in_channels: 1152
+  out_channels: 328
+  raw_in_channels: 1296
+  raw_out_channels: 328
+backbone.layer6.2.se.conv2.conv:
+  in_channels: 328
+  out_channels: 1152
+  raw_in_channels: 328
+  raw_out_channels: 1296
+backbone.layer7.0.depthwise_conv.0:
+  in_channels: 1152
+  out_channels: 1152
+  raw_in_channels: 1296
+  raw_out_channels: 1296
+backbone.layer7.0.depthwise_conv.1:
+  out_channels: 1152
+  raw_out_channels: 1296
+backbone.layer7.0.expand_conv.bn:
+  out_channels: 1152
+  raw_out_channels: 1296
+backbone.layer7.0.expand_conv.conv:
+  in_channels: 192
+  out_channels: 1152
+  raw_in_channels: 216
+  raw_out_channels: 1296
+backbone.layer7.0.linear_conv.bn:
+  out_channels: 320
+  raw_out_channels: 352
+backbone.layer7.0.linear_conv.conv:
+  in_channels: 1152
+  out_channels: 320
+  raw_in_channels: 1296
+  raw_out_channels: 352
+backbone.layer7.0.se.conv1.conv:
+  in_channels: 1152
+  out_channels: 328
+  raw_in_channels: 1296
+  raw_out_channels: 328
+backbone.layer7.0.se.conv2.conv:
+  in_channels: 328
+  out_channels: 1152
+  raw_in_channels: 328
+  raw_out_channels: 1296
+head._layers.1:
+  in_channels: 1280
+  out_channels: 1000
+  raw_in_channels: 1408
+  raw_out_channels: 1000

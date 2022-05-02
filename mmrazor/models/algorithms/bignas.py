@@ -2,6 +2,7 @@
 import random
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
+import mmcv
 import torch
 from torch.nn import Dropout, functional
 
@@ -109,24 +110,21 @@ class BigNAS(BaseAlgorithm):
 
     def __init__(self,
                  resizer_config: Optional[Dict] = None,
+                 is_supernet_training: bool = False,
+                 channel_cfg_path: Optional[str] = None,
                  **kwargs: Any) -> None:
-        # HACK
-        # pruner will raise error if pruned model is not max
-        # retraining = kwargs.get('retraining', False)
-        # if retraining:
-        #     channel_cfg_path = kwargs.pop('channel_cfg')
-        #     channel_cfg = self.load_subnet(channel_cfg_path)
-        #     mutable_cfg_path = kwargs.pop('mutable_cfg')
-        #     mutable_cfg = self.load_subnet(mutable_cfg_path)
-        # kwargs['retraining'] = False
-
         super().__init__(**kwargs)
 
-        if not self.retraining:
+        self._is_supernet_training = is_supernet_training
+        if is_supernet_training:
             if resizer_config is None:
                 raise ValueError('`resizer_config` must be configured when '
                                  'training supernet')
             self._resizer = _InputResizer(**resizer_config)
+        else:
+            if channel_cfg_path is not None:
+                channel_cfg = mmcv.fileio.load(channel_cfg_path)
+                self.pruner.deploy_subnet(self.architecture, channel_cfg)
 
         # assert self.pruner is not None, \
         #     'Pruner must be configured for BigNAS!'
@@ -148,10 +146,10 @@ class BigNAS(BaseAlgorithm):
         """
         optimizer.zero_grad()
 
-        if self.retraining:
-            losses = self._retrain_step(data)
-        else:
+        if self._is_supernet_training:
             losses = self._train_supernet_step(data)
+        else:
+            losses = self._retrain_step(data)
 
         # TODO: clip grad norm
         optimizer.step()
@@ -212,19 +210,19 @@ class BigNAS(BaseAlgorithm):
 
     def _set_min_subnet(self) -> None:
         """set minimum subnet in current search space."""
-        # self.pruner.set_min_channel()
+        self.pruner.set_min_channel()
         self.mutator.set_subnet(self.mutator.min_subnet)
         self._resizer.set_min_shape()
 
     def _set_max_subnet(self) -> None:
         """set maximum subnet in current search space."""
-        # self.pruner.set_max_channel()
+        self.pruner.set_max_channel()
         self.mutator.set_subnet(self.mutator.max_subnet)
         self._resizer.set_max_shape()
 
     def _set_random_subnet(self) -> None:
         """set random subnet in current search space."""
-        # self.pruner.set_random_channel()
+        self.pruner.set_random_channel()
         self.mutator.set_subnet(self.mutator.random_subnet)
         self._resizer.set_random_shape()
 

@@ -1,8 +1,13 @@
 _base_ = ['./bignas.py']
 
-algorithm = dict(retraining=True)
+algorithm = dict(
+    is_supernet_training=False,
+    channel_cfg_path='configs/nas/bignas/bignas_S_channel_cfg.yaml',
+    architecture=dict(
+        mutable_cfg_path='configs/nas/bignas/bignas_S_mutable_cfg.yaml'),
+)
 
-_samples_per_gpu = 96
+_samples_per_gpu = 512
 _number_of_gpus = 8
 _batch_size = _samples_per_gpu * _number_of_gpus
 

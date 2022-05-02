@@ -20,7 +20,7 @@ class BaseArchitecture(BaseModule):
 
     def __init__(self,
                  model_cfg: Dict,
-                 subnet_cfg_path: Optional[str] = None,
+                 mutable_cfg_path: Optional[str] = None,
                  **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -29,23 +29,25 @@ class BaseArchitecture(BaseModule):
 
         # TODO
         # pruner subnet deploy
-        if subnet_cfg_path is not None:
-            subnet_cfg = mmcv.fileio.load(subnet_cfg_path)
-            self.deploy_subnet(subnet_cfg)
+        if mutable_cfg_path is not None:
+            mutable_cfg = mmcv.fileio.load(mutable_cfg_path)
+            self.deploy_mutable_subnet(mutable_cfg)
 
-    def deploy_subnet(self, subnet_cfg: Dict) -> None:
+    def deploy_mutable_subnet(self, mutable_cfg: Dict) -> None:
         for name, module in self.model.named_modules():
             if isinstance(module, BaseMutable):
-                subnet_config = subnet_cfg[name]
+                subnet_config = mutable_cfg[name]
                 module.deploy_subnet(subnet_config)
+                master_only_print(f'module: {name} deploy with subnet config: '
+                                  f'{subnet_config}')
 
-    def export_subnet(self) -> Dict:
-        subnet_cfg = dict()
-        for name, module in self.model.named_modulesq():
+    def export_mutable_subnet(self) -> Dict:
+        mutable_cfg = dict()
+        for name, module in self.model.named_modules():
             if isinstance(module, BaseMutable):
-                subnet_cfg[name] = module.export_subnet()
+                mutable_cfg[name] = module.export_subnet()
 
-        return subnet_cfg
+        return mutable_cfg
 
     def forward_dummy(self, img):
         """Used for calculating network flops."""

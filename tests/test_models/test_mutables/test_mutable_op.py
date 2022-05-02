@@ -54,7 +54,9 @@ def test_dynamic_kernel_conv2d() -> None:
     subnet_config['subnet_choice'] = 3
     dynamic_conv2d.deploy_subnet(subnet_config)
 
-    assert not dynamic_conv2d.is_deployed
+    assert dynamic_conv2d.is_deployed
+    for transform_matrix_name in dynamic_conv2d._transform_matrix_name_list:
+        assert not hasattr(dynamic_conv2d, transform_matrix_name)
     assert dynamic_conv2d.padding == 1
     assert dynamic_conv2d.weight.shape == (32, 3, 3, 3)
 

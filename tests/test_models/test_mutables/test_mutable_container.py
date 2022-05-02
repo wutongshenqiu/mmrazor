@@ -69,7 +69,7 @@ def test_dynamic_kernel_conv2d() -> None:
 
     subnet_config['subnet_choice'] = 3
     dynamic_sequential.deploy_subnet(subnet_config)
-    assert not dynamic_sequential.is_deployed
+    assert dynamic_sequential.is_deployed
     assert len(dynamic_sequential) == 3
 
     assert dynamic_sequential(x).shape == (10, 32, 64, 64)

@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from collections import OrderedDict
+from typing import Dict, Optional
 
 import torch
 import torch.distributed as dist
@@ -34,15 +35,13 @@ class BaseAlgorithm(BaseModule):
 
     def __init__(
         self,
-        architecture,
-        mutator=None,
-        pruner=None,
-        distiller=None,
-        retraining=False,
-        init_cfg=None,
+        architecture: Dict,
+        mutator: Optional[Dict] = None,
+        pruner: Optional[Dict] = None,
+        distiller: Optional[Dict] = None,
+        init_cfg: Optional[Dict] = None,
     ):
         super(BaseAlgorithm, self).__init__(init_cfg)
-        self.retraining = retraining
 
         self.architecture = build_architecture(architecture)
         self.deployed = False
@@ -71,7 +70,7 @@ class BaseAlgorithm(BaseModule):
             pruner (dict): Config for pruner, which is an algorithm component
                 for pruning.
         """
-        if pruner is None or self.retraining:
+        if pruner is None:
             self.pruner = None
             return
         self.pruner = build_pruner(pruner)
