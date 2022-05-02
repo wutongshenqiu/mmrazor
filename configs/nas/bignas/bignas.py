@@ -1,7 +1,7 @@
 _base_ = [
-    '../../_base_/datasets/mmcls/imagenet_bs128_colorjittor_aa_bignas.py',
     '../../_base_/mmcls_runtime.py'
-    '../../_base_/datasets/pipelines/rand_aug.py'
+    '../../_base_/datasets/pipelines/rand_aug.py',
+    '../../_base_/schedules/mmcls/imagenet_bs1024_aa_bignas.py',
 ]
 
 _samples_per_gpu = 512
