@@ -173,18 +173,6 @@ def main():
     algorithm = build_algorithm(cfg.algorithm)
     algorithm.init_weights()
 
-    import pdb
-    pdb.set_trace()
-
-    from mmrazor.models.algorithms.bignas import BigNAS
-
-    algorithm: BigNAS
-    opt = torch.optim.SGD(algorithm.parameters(), lr=1)
-    imgs = torch.randn(16, 3, 224, 224)
-    label = torch.randint(0, 10, (16, ))
-    data = {'img': imgs, 'gt_label': label}
-    algorithm.train_step(data, opt)
-
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
