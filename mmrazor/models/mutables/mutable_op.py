@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Dict, Iterable, List, Tuple
+from typing import Callable, Dict, Iterable, List, Set, Tuple
 
 import torch
 from torch import Tensor, nn
@@ -13,6 +13,7 @@ from .base import DynamicMutable
 
 @MUTABLES.register_module()
 class DynamicKernelConv2d(DynamicMutable[int], Conv2d):
+    valid_dynamic_mode: Set[str] = {'progressive', 'center_crop'}
 
     def __init__(self,
                  in_channels: int,
@@ -23,7 +24,14 @@ class DynamicKernelConv2d(DynamicMutable[int], Conv2d):
                  padding_mode: str = 'zeros',
                  dilation: int = 1,
                  groups: int = 1,
-                 bias: bool = True) -> None:
+                 bias: bool = True,
+                 dynamic_mode: str = 'center_crop') -> None:
+        assert dynamic_mode in self.valid_dynamic_mode, \
+            f'Expect dynamic mode: {self.valid_dynamic_mode}, ' \
+            f'but got: {dynamic_mode}'
+        self._dynamic_mode = dynamic_mode
+        self._get_weight_fn = self.mode2weight_fn[dynamic_mode]
+
         kernel_size_list = sorted(list(set(kernel_size_list)), reverse=True)
         self._kernel_size_list = kernel_size_list
         self.set_choice(self.max_choice)
@@ -40,17 +48,24 @@ class DynamicKernelConv2d(DynamicMutable[int], Conv2d):
             bias=bias,
             padding_mode=padding_mode)
 
-        transform_matrix_name_list = []
-        for i in range(self.num_choices - 1):
-            source_kernel_size = self.choices[i]
-            target_kernel_size = self.choices[i + 1]
-            transform_matrix_name = self._get_transform_matrix_name(
-                src=source_kernel_size, tar=target_kernel_size)
-            transform_matrix_name_list.append(transform_matrix_name)
-            self.register_parameter(
-                name=transform_matrix_name,
-                param=nn.Parameter(torch.eye(target_kernel_size**2)))
-        self._transform_matrix_name_list = transform_matrix_name_list
+        if dynamic_mode == 'progressive':
+            master_only_print(
+                'Initialize transform matrix for progressively shrink')
+            transform_matrix_name_list = []
+            for i in range(self.num_choices - 1):
+                source_kernel_size = self.choices[i]
+                target_kernel_size = self.choices[i + 1]
+                transform_matrix_name = self._get_transform_matrix_name(
+                    src=source_kernel_size, tar=target_kernel_size)
+                transform_matrix_name_list.append(transform_matrix_name)
+                transform_matrix = nn.Parameter(
+                    torch.eye(target_kernel_size**2))
+                self.register_parameter(
+                    name=transform_matrix_name, param=transform_matrix)
+                master_only_print(
+                    f'transform matrix: {transform_matrix_name}, '
+                    f'shape: {transform_matrix.shape}')
+            self._transform_matrix_name_list = transform_matrix_name_list
 
         self._is_deployed = False
 
@@ -79,15 +94,16 @@ class DynamicKernelConv2d(DynamicMutable[int], Conv2d):
             return
 
         choice = self.get_subnet_choice(subnet_config)
-        weight = self._get_weight(choice)
+        weight = self._get_weight_fn(choice)
         padding = self._get_padding(choice)
         self.weight = nn.Parameter(weight)
         self.padding = padding
 
-        for transform_matrix_name in self._transform_matrix_name_list:
-            delattr(self, transform_matrix_name)
-            master_only_print(
-                f'delete transform matrix: {transform_matrix_name}')
+        if self._dynamic_mode == 'progressive':
+            for transform_matrix_name in self._transform_matrix_name_list:
+                delattr(self, transform_matrix_name)
+                master_only_print(
+                    f'delete transform matrix: {transform_matrix_name}')
 
         self._is_deployed = True
 
@@ -95,7 +111,7 @@ class DynamicKernelConv2d(DynamicMutable[int], Conv2d):
         return Conv2d.forward(self, x)
 
     def forward_sample(self, x: Tensor, choice: int) -> Tensor:
-        weight = self._get_weight(choice)
+        weight = self._get_weight_fn(choice)
         padding = self._get_padding(choice)
 
         return F.conv2d(
@@ -111,7 +127,16 @@ class DynamicKernelConv2d(DynamicMutable[int], Conv2d):
     def _get_transform_matrix_name(src: int, tar: int) -> str:
         return f'transform_matrix_{src}to{tar}'
 
-    def _get_weight(self, kernel_size: int) -> torch.Tensor:
+    def _get_weight_center_crop(self, kernel_size: int) -> torch.Tensor:
+        if kernel_size == self.max_choice:
+            return self.weight
+
+        start_offset, end_offset = self._get_current_kernel_pos(
+            source_kernel_size=self.max_choice, target_kernel_size=kernel_size)
+        return self.weight[:, :, start_offset:end_offset,
+                           start_offset:end_offset]
+
+    def _get_weight_progressive(self, kernel_size: int) -> torch.Tensor:
         if kernel_size == self.max_choice:
             return self.weight
 
@@ -161,3 +186,10 @@ class DynamicKernelConv2d(DynamicMutable[int], Conv2d):
     @staticmethod
     def _get_padding(kernel_size: int) -> int:
         return kernel_size >> 1
+
+    @property
+    def mode2weight_fn(self) -> Dict[str, Callable]:
+        return {
+            'progressive': self._get_weight_progressive,
+            'center_crop': self._get_weight_center_crop
+        }
