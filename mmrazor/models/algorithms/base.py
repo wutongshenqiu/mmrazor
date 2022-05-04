@@ -19,11 +19,9 @@ class BaseAlgorithm(BaseModule):
         init_cfg (dict): Init config for ``BaseModule``.
     """
 
-    def __init__(
-        self,
-        architecture_cfg: Dict,
-        init_cfg: Optional[Dict] = None,
-    ):
+    def __init__(self,
+                 architecture_cfg: Dict,
+                 init_cfg: Optional[Dict] = None) -> None:
         super(BaseAlgorithm, self).__init__(init_cfg)
 
         self.architecture = build_architecture(architecture_cfg)
