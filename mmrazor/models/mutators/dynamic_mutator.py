@@ -1,8 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from torch.nn import Module
-
+from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import MUTATORS
 from mmrazor.models.mutables.base import DynamicMutable
 from .base import BaseMutator
@@ -10,22 +9,36 @@ from .base import BaseMutator
 
 @MUTATORS.register_module()
 class DynamicMutator(BaseMutator):
-    search_space: Dict[int, List[DynamicMutable]]
 
-    def __init__(self, search_groups: Dict[str, Dict], **kwargs) -> None:
+    def __init__(self,
+                 search_groups: Optional[Dict[str, Dict]] = None,
+                 **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
-        self._search_groups = search_groups
-
+        if search_groups is None:
+            search_groups = dict()
         module2group_id = dict()
         for idx, group in enumerate(search_groups):
             for module_name in group['modules']:
                 module2group_id[module_name] = idx
+        self._module2group_id: Dict[str, int] = module2group_id
+        self._search_groups = search_groups
 
-        self._module2group_id = module2group_id
+        self._search_space = None
 
-    def build_search_space(
-            self, supernet: Module) -> Dict[int, List[DynamicMutable]]:
+    def prepare_from_supernet(self, supernet: BaseArchitecture) -> None:
+        self._search_space = self._build_search_space(supernet)
+
+    @property
+    def search_space(self) -> Dict[int, List[DynamicMutable]]:
+        if self._search_space is None:
+            raise AttributeError(
+                'Call `prepare_from_supernet` before access search space')
+        return self._search_space
+
+    def _build_search_space(
+            self,
+            supernet: BaseArchitecture) -> Dict[int, List[DynamicMutable]]:
         search_space = dict()
         group_nums = len(self._search_groups)
         for name, module in supernet.named_modules():
@@ -58,7 +71,7 @@ class DynamicMutator(BaseMutator):
         return min_subnet
 
     @property
-    def random_subnet(self):
+    def random_subnet(self) -> Dict[int, Any]:
         random_subnet = dict()
         for group_id, modules in self.search_space.items():
             random_subnet[group_id] = modules[0].random_choice
@@ -67,7 +80,7 @@ class DynamicMutator(BaseMutator):
         # dist.broadcast_object_list()
         return random_subnet
 
-    def set_subnet(self, subnet_dict):
+    def set_subnet(self, subnet_dict: Dict[int, Any]) -> None:
         for group_id, modules in self.search_space.items():
             choice = subnet_dict[group_id]
             for module in modules:

@@ -63,28 +63,28 @@ class OneShotMutable(BaseMutable[CHOICE_TYPE]):
 
     @abstractmethod
     def forward_deploy(self, x: Any) -> Any:
-        ...
+        """Forward when mutable is deployed."""
 
     @abstractmethod
     def forward_sample(self, x: Any, choice: CHOICE_TYPE) -> Any:
-        ...
+        """Forward with given choice when mutable needs to be sampled."""
 
     @abstractmethod
     def set_choice(self, choice: CHOICE_TYPE) -> None:
-        ...
+        """Set current choice, will affect `current_choice` property."""
 
     @property
     @abstractmethod
     def current_choice(self) -> CHOICE_TYPE:
-        ...
+        """Return current choice."""
 
     @abstractmethod
     def export_subnet(self) -> Dict:
-        ...
+        """Export subnet with current choice."""
 
     @abstractmethod
     def deploy_subnet(self, subnet_config: Dict) -> None:
-        ...
+        """Deploy subnet with given choice."""
 
 
 class DynamicMutable(OneShotMutable[CHOICE_TYPE]):
@@ -108,6 +108,7 @@ class DynamicMutable(OneShotMutable[CHOICE_TYPE]):
             subnet_choice=self.current_choice, all_choices=self.choices)
 
     def get_subnet_choice(self, subnet_config: Dict[str, Any]) -> CHOICE_TYPE:
+        """Extract choice of given subnet config."""
         subnet_choice = subnet_config.get('subnet_choice')
         if subnet_choice is None:
             raise ValueError(

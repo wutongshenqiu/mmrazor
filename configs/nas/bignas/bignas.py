@@ -116,7 +116,7 @@ se_cfg = dict(
              dict(
                  type='HSigmoid', bias=3, divisor=6, min_value=0,
                  max_value=1)))
-norm_cfg = dict(type='BN')
+norm_cfg = dict(type='SyncBN')
 model_cfg = dict(
     type='mmcls.ImageClassifier',
     backbone=dict(

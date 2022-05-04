@@ -25,7 +25,7 @@ class BaseArchitecture(BaseModule):
         super().__init__(**kwargs)
 
         self.model: Module = MODELS.build(model_cfg)
-        master_only_print(self.model)
+        # master_only_print(self.model)
 
         # TODO
         # pruner subnet deploy
