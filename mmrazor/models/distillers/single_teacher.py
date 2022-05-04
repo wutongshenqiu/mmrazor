@@ -230,9 +230,9 @@ class SingleTeacherDistiller(BaseDistiller):
             for out_idx, (s_out, t_out) in enumerate(
                     zip(student_outputs, teacher_outputs)):
 
-                for loss in component.losses:
-                    loss_module = self.losses[loss.name]
-                    loss_name = f'{loss.name}.{out_idx}'
+                for loss in component['losses']:
+                    loss_module = self.losses[loss['name']]
+                    loss_name = f'{loss["name"]}.{out_idx}'
                     # TODO ugly implementation.
                     # Pass the gt_label to loss function.
                     # Only used by WSLD.

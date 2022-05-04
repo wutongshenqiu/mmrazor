@@ -218,10 +218,10 @@ algorithm = dict(
     type='BigNAS',
     resizer_config=dict(
         shape_list=[192, 224, 288, 320], interpolation_type='bicubic'),
-    architecture=dict(type='MMClsArchitecture', model_cfg=model_cfg),
-    mutator=dict(type='DynamicMutator', search_groups=search_groups),
-    pruner=pruner,
-    distiller=dict(
+    architecture_cfg=dict(type='MMClsArchitecture', model_cfg=model_cfg),
+    mutator_cfg=dict(type='DynamicMutator', search_groups=search_groups),
+    pruner_cfg=pruner,
+    distiller_cfg=dict(
         type='SelfDistiller',
         components=[
             dict(
@@ -236,6 +236,6 @@ algorithm = dict(
                     )
                 ]),
         ]),
-    is_supernet_training=False)
+    is_supernet_training=True)
 
 use_ddp_wrapper = True

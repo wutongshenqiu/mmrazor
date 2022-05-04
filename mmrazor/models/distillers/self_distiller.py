@@ -29,7 +29,7 @@ class SelfDistiller(BaseDistiller):
             self.student_outputs[student_module_name] = list()
             self.teacher_outputs[teacher_module_name] = list()
 
-            for loss in component.losses:
+            for loss in component['losses']:
                 loss_cfg = loss.copy()
                 loss_name = loss_cfg.pop('name')
                 self.losses[loss_name] = build_loss(loss_cfg)
@@ -130,9 +130,9 @@ class SelfDistiller(BaseDistiller):
             for out_idx, (s_out, t_out) in enumerate(
                     zip(student_outputs, teacher_outputs)):
 
-                for loss in component.losses:
-                    loss_module = self.losses[loss.name]
-                    loss_name = f'{loss.name}.{out_idx}'
+                for loss in component['losses']:
+                    loss_module = self.losses[loss['name']]
+                    loss_name = f'{loss["name"]}.{out_idx}'
 
                     loss_module.current_data = data
                     losses[loss_name] = loss_module(s_out, t_out)

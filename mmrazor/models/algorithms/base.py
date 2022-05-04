@@ -6,9 +6,7 @@ import torch
 import torch.distributed as dist
 from mmcv.runner import BaseModule
 
-from mmrazor.models.builder import (ALGORITHMS, build_architecture,
-                                    build_distiller, build_mutator,
-                                    build_pruner)
+from mmrazor.models.builder import ALGORITHMS, build_architecture
 
 
 @ALGORITHMS.register_module()
@@ -17,92 +15,18 @@ class BaseAlgorithm(BaseModule):
     and algorithm components.
 
     Args:
-        architecture (dict): Config for architecture to be slimmed.
-        mutator (dict): Config for mutator, which is an algorithm component
-            for NAS.
-        pruner (dict): Config for pruner, which is an algorithm component
-            for pruning.
-        distiller (dict): Config for pruner, which is an algorithm component
-            for knowledge distillation.
-        retraining (bool): Whether is in retraining stage, if False,
-            it is in pre-training stage.
+        architecture_cfg (dict): Config for architecture to be slimmed.
         init_cfg (dict): Init config for ``BaseModule``.
-        mutable_cfg (dict): Config for mutable of the subnet searched out,
-            it will be needed in retraining stage.
-        channel_cfg (dict): Config for channel of the subnet searched out,
-            it will be needed in retraining stage.
     """
 
     def __init__(
         self,
-        architecture: Dict,
-        mutator: Optional[Dict] = None,
-        pruner: Optional[Dict] = None,
-        distiller: Optional[Dict] = None,
+        architecture_cfg: Dict,
         init_cfg: Optional[Dict] = None,
     ):
         super(BaseAlgorithm, self).__init__(init_cfg)
 
-        self.architecture = build_architecture(architecture)
-        self.deployed = False
-
-        self._init_mutator(mutator)
-        self._init_pruner(pruner)
-        self._init_distiller(distiller)
-
-    def _init_mutator(self, mutator):
-        """Build registered mutators and make preparations.
-
-        Args:
-            mutator (dict): Config for mutator, which is an algorithm component
-                for NAS.
-        """
-        if mutator is None:
-            self.mutator = None
-            return
-        self.mutator = build_mutator(mutator)
-        self.mutator.prepare_from_supernet(self.architecture.model)
-
-    def _init_pruner(self, pruner):
-        """Build registered pruners and make preparations.
-
-        Args:
-            pruner (dict): Config for pruner, which is an algorithm component
-                for pruning.
-        """
-        if pruner is None:
-            self.pruner = None
-            return
-        self.pruner = build_pruner(pruner)
-        self.pruner.prepare_from_supernet(self.architecture)
-
-    def _init_distiller(self, distiller):
-        """Build registered distillers and make preparations.
-
-        Args:
-            distiller (dict): Config for pruner, which is an algorithm
-                component for knowledge distillation.
-        """
-        if distiller is None:
-            self.distiller = None
-            return
-        self.distiller = build_distiller(distiller)
-        self.distiller.prepare_from_student(self.architecture)
-
-    @property
-    def with_mutator(self):
-        """Whether or not this property exists."""
-        return hasattr(self, 'mutator') and self.mutator is not None
-
-    @property
-    def with_pruner(self):
-        """Whether or not this property exists."""
-        return hasattr(self, 'pruner') and self.pruner is not None
-
-    @property
-    def with_distiller(self):
-        """Whether or not this property exists."""
-        return hasattr(self, 'distiller') and self.distiller is not None
+        self.architecture = build_architecture(architecture_cfg)
 
     def forward(self, img, return_loss=True, **kwargs):
         """Calls either forward_train or forward_test depending on whether

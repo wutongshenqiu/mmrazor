@@ -7,7 +7,8 @@ import torch
 from torch.nn import Dropout, functional
 
 from mmrazor.models.architectures.base import BaseArchitecture
-from mmrazor.models.builder import ALGORITHMS
+from mmrazor.models.builder import (ALGORITHMS, build_distiller, build_mutator,
+                                    build_pruner)
 from mmrazor.models.distillers import SelfDistiller
 from mmrazor.models.mutators import DynamicMutator
 from mmrazor.models.pruners import RangePruner
@@ -102,20 +103,23 @@ class _InputResizer:
 
 @ALGORITHMS.register_module()
 class BigNAS(BaseAlgorithm):
-    pruner: RangePruner
-    mutator: DynamicMutator
-    distiller: SelfDistiller
-    num_sample_training: int
     architecture: BaseArchitecture
 
     def __init__(self,
                  resizer_config: Optional[Dict] = None,
                  is_supernet_training: bool = False,
+                 num_sample_training: int = 4,
                  channel_cfg_path: Optional[str] = None,
+                 mutator_cfg: Optional[Dict] = None,
+                 pruner_cfg: Optional[Dict] = None,
+                 distiller_cfg: Optional[Dict] = None,
                  **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
-        self._is_supernet_training = is_supernet_training
+        self._mutator = self._init_mutator(mutator_cfg)
+        self._pruner = self._init_pruner(pruner_cfg)
+        self._distiller = self._init_distiller(distiller_cfg)
+
         if is_supernet_training:
             if resizer_config is None:
                 raise ValueError('`resizer_config` must be configured when '
@@ -126,12 +130,59 @@ class BigNAS(BaseAlgorithm):
                 channel_cfg = mmcv.fileio.load(channel_cfg_path)
                 self.pruner.deploy_subnet(self.architecture, channel_cfg)
 
-        # assert self.pruner is not None, \
-        #     'Pruner must be configured for BigNAS!'
-        # assert self.distiller is not None, \
-        #     'Distiller must be configured for BigNAS!'
-        # assert self.mutator is not None, \
-        #     'Mutator must be configured for BigNAS!'
+        self._is_supernet_training = is_supernet_training
+        self._num_sample_training = num_sample_training
+
+    @property
+    def mutator(self) -> DynamicMutator:
+        if self._mutator is None:
+            raise AttributeError(
+                'Try to access mutator without initialization!')
+        return self._mutator
+
+    @property
+    def pruner(self) -> RangePruner:
+        if self._pruner is None:
+            raise AttributeError(
+                'Try to access pruner without initialization!')
+        return self._pruner
+
+    @property
+    def distiller(self) -> SelfDistiller:
+        if self._distiller is None:
+            raise AttributeError(
+                'Try to access distiller without initialization!')
+        return self._distiller
+
+    def _init_mutator(self,
+                      mutator_cfg: Optional[Dict]) -> Optional[DynamicMutator]:
+        if mutator_cfg is None:
+            return
+
+        mutator = build_mutator(mutator_cfg)
+        mutator.prepare_from_supernet(self.architecture.model)
+
+        return mutator
+
+    def _init_pruner(self,
+                     pruner_cfg: Optional[Dict]) -> Optional[RangePruner]:
+        if pruner_cfg is None:
+            return
+
+        pruner = build_pruner(pruner_cfg)
+        pruner.prepare_from_supernet(self.architecture)
+
+        return pruner
+
+    def _init_distiller(
+            self, distiller_cfg: Optional[Dict]) -> Optional[SelfDistiller]:
+        if distiller_cfg is None:
+            return
+
+        distiller = build_distiller(distiller_cfg)
+        distiller.prepare_from_student(self.architecture)
+
+        return distiller
 
     def train_step(self, data: Dict, optimizer: torch.optim.Optimizer) -> Dict:
         """Train step function.
@@ -195,7 +246,7 @@ class BigNAS(BaseAlgorithm):
         min_subnet_loss, _ = self._parse_losses(min_subnet_losses)
         min_subnet_loss.backward()
 
-        for i in range(self.num_sample_training - 2):
+        for i in range(self._num_sample_training - 2):
             self._set_random_subnet()
 
             random_img = self._resizer.resize(original_img)
@@ -207,6 +258,8 @@ class BigNAS(BaseAlgorithm):
 
             subnet_loss, _ = self._parse_losses(subnet_losses)
             subnet_loss.backward()
+
+        return losses
 
     def _set_min_subnet(self) -> None:
         """set minimum subnet in current search space."""

@@ -36,7 +36,7 @@ def test_dynamic_mutator() -> None:
     with pytest.raises(AttributeError):
         _ = mutator.search_space
 
-    mutator.prepare_from_supernet(architecture)
+    mutator.prepare_from_supernet(architecture.model)
     for _, modules in mutator.search_space.items():
         assert len(modules) == 1
 
@@ -109,7 +109,7 @@ def test_dynamic_mutator() -> None:
     with pytest.raises(AttributeError):
         _ = mutator.search_space
 
-    mutator.prepare_from_supernet(architecture)
+    mutator.prepare_from_supernet(architecture.model)
     for group_id, modules in mutator.search_space.items():
         if group_id in group_id2nums:
             assert group_id2nums[group_id] == len(modules)

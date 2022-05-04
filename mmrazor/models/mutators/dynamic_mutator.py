@@ -21,6 +21,10 @@ class DynamicMutator(BaseMutator):
         for idx, group in enumerate(search_groups):
             for module_name in group['modules']:
                 module2group_id[module_name] = idx
+        assert set(module2group_id.values()) == \
+            set(range(len(search_groups))), \
+            'Please make sure the rightness of `search_groups`!'
+
         self._module2group_id: Dict[str, int] = module2group_id
         self._search_groups = search_groups
 
