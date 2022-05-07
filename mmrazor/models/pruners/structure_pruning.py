@@ -469,28 +469,18 @@ class StructurePruner(BaseModule, metaclass=ABCMeta):
             module.register_buffer(
                 'out_mask',
                 module.weight.new_ones((1, module.out_channels, 1, 1), ))
-<<<<<<< HEAD
-            module.forward = self.modify_conv_forward(module)
-        if isinstance(module, nn.Linear):
-=======
             if is_modify_forward:
                 module.forward = self.modify_conv_forward(module)
-        if type(module).__name__ == 'Linear':
->>>>>>> add resrep
+        if isinstance(module, nn.Linear):
             module.register_buffer(
                 'in_mask', module.weight.new_ones((1, module.in_features), ))
             module.register_buffer(
                 'out_mask', module.weight.new_ones((1, module.out_features), ))
-<<<<<<< HEAD
-            module.forward = self.modify_fc_forward(module)
+            if is_modify_forward:
+                module.forward = self.modify_fc_forward(module)
         if (isinstance(module, _BatchNorm)
                 or isinstance(module, _InstanceNorm)
                 or isinstance(module, GroupNorm)):
-=======
-            if is_modify_forward:
-                module.forward = self.modify_fc_forward(module)
-        if isinstance(module, nn.modules.batchnorm._BatchNorm):
->>>>>>> add resrep
             module.register_buffer(
                 'out_mask',
                 module.weight.new_ones((1, len(module.weight), 1, 1), ))

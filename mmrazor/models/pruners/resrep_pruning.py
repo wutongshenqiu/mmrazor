@@ -137,7 +137,7 @@ class ResRepPruner(StructurePruner):
                 group2modules[group] = [module_name]
 
         # HACK: just for verify correction
-        self._conv_bn_links = {v: k for k, v in self.bn_conv_links.items()}
+        self._norm_conv_links = {v: k for k, v in self.norm_conv_links.items()}
 
         compactor2modules: Dict[str, List[str]] = dict()
         compactors = nn.ModuleDict()
@@ -160,7 +160,7 @@ class ResRepPruner(StructurePruner):
                 feature_nums=out_channels, name=compactor_name)
 
             for module_name in modules_name:
-                if module_name not in self._conv_bn_links:
+                if module_name not in self._norm_conv_links:
                     _print_debug_msg(
                         f'{module_name} does not have a bn layer follow, skip!'
                     )
@@ -168,7 +168,7 @@ class ResRepPruner(StructurePruner):
                 module = self.name2module[module_name]
                 if type(module).__name__ == 'Conv2d' and module.groups == 1:
                     module.__compactor_name__ = compactor_name
-                    follow_bn_name = self._conv_bn_links[module_name]
+                    follow_bn_name = self._norm_conv_links[module_name]
                     follow_bn_module = self.name2module[follow_bn_name]
                     follow_bn_module.__original_forward = \
                         follow_bn_module.forward
