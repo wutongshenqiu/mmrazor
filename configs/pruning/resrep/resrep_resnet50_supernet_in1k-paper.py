@@ -1,6 +1,4 @@
-_base_ = [
-    '../../_base_/mmcls_runtime.py'
-]
+_base_ = ['../../_base_/mmcls_runtime.py']
 
 _samples_per_gpu = 32
 _number_of_gpus = 8
@@ -13,7 +11,7 @@ file_client_args = dict(
     path_mapping=dict({
         'data/imagenet/':
         'sproject:s3://openmmlab/datasets/classification/imagenet/',
-        'data/imagenet/': 
+        'data/imagenet/':
         'sproject:s3://openmmlab/datasets/classification/imagenet/'
     }))
 
@@ -61,9 +59,7 @@ data = dict(
         ann_file='data/imagenet/meta/val.txt',
         pipeline=test_pipeline))
 evaluation = dict(
-    interval=1, 
-    metric_options={'topk': (1, 5)},
-    save_best='auto')
+    interval=1, metric_options={'topk': (1, 5)}, save_best='auto')
 checkpoint_config = dict(interval=1, max_keep_ckpts=30)
 
 # model settings
@@ -83,9 +79,8 @@ model = dict(
         loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
         topk=(1, 5)),
     init_cfg=dict(
-        type='Pretrained', 
-        checkpoint='checkpoint/resnet50-0676ba61-mmcls_style.pth')
-    )
+        type='Pretrained',
+        checkpoint='checkpoint/resnet50-0676ba61-mmcls_style.pth'))
 
 algorithm = dict(
     type='ResRep',

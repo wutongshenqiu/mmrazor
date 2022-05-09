@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 from typing import Any, Dict, Hashable, Tuple
 
 SUBNET_TYPE = Dict[Hashable, Any]

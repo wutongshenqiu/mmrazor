@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
+from functools import reduce
 from types import MethodType
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional
 
@@ -67,8 +68,21 @@ class CompactorLayer(nn.Module):
 
     @torch.no_grad()
     def get_metric_list(self) -> List[float]:
-        return torch.sqrt(torch.sum(self._layer.weight**2,
-                                    dim=(1, 2, 3))).tolist()
+        return self.get_metric_tensor().tolist()
+
+    @torch.no_grad()
+    def get_metric_tensor(self) -> torch.Tensor:
+        return torch.sqrt(torch.sum(self._layer.weight**2, dim=(1, 2, 3)))
+
+    @torch.no_grad()
+    def filter_ids_ge_threshold(self, threshold: float) -> torch.Tensor:
+        metric_tensor = self.get_metric_tensor()
+        return torch.where(metric_tensor >= threshold)[0]
+
+    @torch.no_grad()
+    def filter_ids_l_threshold(self, threshold: float) -> torch.Tensor:
+        metric_tensor = self.get_metric_tensor()
+        return torch.where(metric_tensor < threshold)[0]
 
     @property
     def deactivated_filter_nums(self) -> int:
@@ -77,6 +91,10 @@ class CompactorLayer(nn.Module):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def weight(self) -> torch.Tensor:
+        return self._layer.weight
 
 
 @PRUNERS.register_module()
@@ -90,7 +108,8 @@ class ResRepPruner(StructurePruner):
                  least_channel_nums: int = 1,
                  lasso_strength: float = 1e-4,
                  input_shape: Iterable[int] = (3, 224, 224),
-                 follow_paper: bool = False,
+                 follow_paper: bool = True,
+                 threshold: float = 1e-5,
                  **kwargs: Any) -> None:
         if (flops_constraint is None and flops_ratio is None) or \
                 (flops_constraint is not None and flops_ratio is not None):
@@ -109,6 +128,9 @@ class ResRepPruner(StructurePruner):
         if lasso_strength <= 0:
             raise ValueError(f'`lasso_strength` must greater than 0, '
                              f'but got `{lasso_strength}`')
+        if threshold < 0:
+            raise ValueError(f'`threshold` must greater than or equal to 0, '
+                             f'but got `{threshold}`')
 
         super(ResRepPruner, self).__init__(**kwargs)
 
@@ -122,6 +144,7 @@ class ResRepPruner(StructurePruner):
         self._lasso_strength = lasso_strength
         self._input_shape = input_shape
         self._follow_paper = follow_paper
+        self._threshold = threshold
 
     # TODO
     # should other layer except compactor has mask?
@@ -137,7 +160,7 @@ class ResRepPruner(StructurePruner):
                 group2modules[group] = [module_name]
 
         # HACK: just for verify correction
-        self._norm_conv_links = {v: k for k, v in self.norm_conv_links.items()}
+        self._conv_norm_links = {v: k for k, v in self.norm_conv_links.items()}
 
         compactor2modules: Dict[str, List[str]] = dict()
         compactors = nn.ModuleDict()
@@ -160,23 +183,26 @@ class ResRepPruner(StructurePruner):
                 feature_nums=out_channels, name=compactor_name)
 
             for module_name in modules_name:
-                if module_name not in self._norm_conv_links:
+                if module_name not in self._conv_norm_links:
                     _print_debug_msg(
                         f'{module_name} does not have a bn layer follow, skip!'
                     )
                     continue
                 module = self.name2module[module_name]
-                if type(module).__name__ == 'Conv2d' and module.groups == 1:
+                if isinstance(module, nn.Conv2d) and module.groups == 1:
+                    follow_norm_name = self._conv_norm_links[module_name]
+                    follow_norm_module = self.name2module[follow_norm_name]
+                    if not isinstance(follow_norm_module, nn.BatchNorm2d):
+                        continue
+
                     module.__compactor_name__ = compactor_name
-                    follow_bn_name = self._norm_conv_links[module_name]
-                    follow_bn_module = self.name2module[follow_bn_name]
-                    follow_bn_module.__original_forward = \
-                        follow_bn_module.forward
-                    follow_bn_module.forward = self.modify_bn_forward(
-                        module=follow_bn_module,
+                    follow_norm_module.__original_forward = \
+                        follow_norm_module.forward
+                    follow_norm_module.forward = self.modify_bn_forward(
+                        module=follow_norm_module,
                         compactor=compactors[compactor_name])
                     _print_debug_msg(
-                        f'modify {follow_bn_name} with compactor: '
+                        f'modify {follow_norm_name} with compactor: '
                         f'{compactor_name}')
                     # original code
                     # module.__compactor_name__ = compactor_name
@@ -197,6 +223,9 @@ class ResRepPruner(StructurePruner):
              f'corresponding modules: {compactor2modules[cn]}'
              for cn, c in compactors.items()))
         _print_debug_msg(compactor2modules_msg)
+
+        # HACK: to align with checkpoint
+        self._set_convs_mask(self.sample_subnet(supernet))
 
     @staticmethod
     def modify_bn_forward(module,
@@ -333,7 +362,7 @@ class ResRepPruner(StructurePruner):
             (f'{k}, deactivated numbers: '
              f'{self._get_mask_deactivated_filter_nums(v)}, '
              f'activated numbers: {self._get_mask_activated_filter_nums(v)}, '
-             f'total numbers: {v.shape[1]}'
+             f'total numbers: {v.shape[0]}'
              for k, v in next_compactors_mask.items()))
         _print_debug_msg(compactor_mask_info)
         return next_compactors_mask
@@ -567,3 +596,82 @@ class ResRepPruner(StructurePruner):
     # DDP bug
     def forward(self, architecture: BaseArchitecture, data: Dict) -> Dict:
         return architecture(**data)
+
+    @staticmethod
+    def _fuse_conv_bn(conv: nn.Conv2d, bn: nn.BatchNorm2d) -> nn.Conv2d:
+        conv_w = conv.weight
+        conv_b = conv.bias if conv.bias is not None else torch.zeros_like(
+            bn.running_mean)
+
+        factor = bn.weight / torch.sqrt(bn.running_var + bn.eps)
+        conv.weight = nn.Parameter(
+            conv_w * factor.reshape([conv.out_channels, 1, 1, 1]))
+        conv.bias = nn.Parameter((conv_b - bn.running_mean) * factor + bn.bias)
+
+        return conv
+
+    @torch.no_grad()
+    def convert_compactor(self, supernet: BaseArchitecture) -> None:
+
+        def fold_conv(conv: nn.Conv2d,
+                      filtered_compactor_weight: torch.Tensor) -> nn.Conv2d:
+            conv_weight = conv.weight
+            new_conv_weight = F.conv2d(
+                conv_weight.permute(1, 0, 2, 3),
+                filtered_compactor_weight).permute(1, 0, 2, 3)
+
+            conv_bias = conv.bias
+            new_conv_bias = torch.zeros(filtered_compactor_weight.shape[0])
+            for i in range(new_conv_bias.shape[0]):
+                new_conv_bias[i] = conv_bias.dot(
+                    filtered_compactor_weight[i, :, 0, 0])
+
+            conv.weight = nn.Parameter(new_conv_weight)
+            conv.bias = nn.Parameter(new_conv_bias)
+
+            return conv
+
+        model = supernet.model
+        for compactor_name, conv_names in self._compactor2modules.items():
+            for conv_name in conv_names:
+                bn_name = self._conv_norm_links[conv_name]
+                conv_module = self.name2module[conv_name]
+                bn_module = self.name2module[bn_name]
+                fused_conv = self._fuse_conv_bn(conv_module, bn_module)
+
+                compactor = self._compactors[compactor_name]
+                filter_ids_l_threshold = compactor.filter_ids_l_threshold(
+                    self._threshold)
+                _print_debug_msg(
+                    f'conv: {conv_name}, pruned channels: '
+                    f'{len(filter_ids_l_threshold)}, total channels: '
+                    f'{compactor.weight.shape[0]}')
+                compactor.weight[filter_ids_l_threshold] = 0
+                folded_conv = fold_conv(fused_conv, compactor.weight)
+                _print_debug_msg(f'Reset conv: {conv_name}')
+                self._replace_module(model, conv_name, folded_conv)
+                # TODO
+                # replace bn layer with identity
+                _print_debug_msg(f'Replace bn: {bn_name} with identity')
+                self._replace_module(model, bn_name, nn.Identity())
+
+        delattr(self, '_compactors')
+
+        _print_debug_msg('convert compactors done.')
+
+    @staticmethod
+    def _get_parent_module_by_name(model: nn.Module,
+                                   module_name: str) -> nn.Module:
+        module_names = module_name.split('.')
+        if len(module_names) == 1:
+            return model
+        parent_module_names = module_names[:-1]
+
+        return reduce(getattr, parent_module_names, model)
+
+    def _replace_module(self, model: nn.Module, module_name: str,
+                        new_module: nn.Module) -> None:
+        parent_module = self._get_parent_module_by_name(model, module_name)
+        child_module_name = module_name.split('.')[-1]
+
+        setattr(parent_module, child_module_name, new_module)

@@ -420,21 +420,20 @@ def _test_resrep_pruner_init(pruner_cfg) -> None:
 
 
 def _test_resrep_pruner_compactor_same_weights_after_init_weights(
-        pruner_cfg,
-        architecture_cfg) -> None:
+        pruner_cfg, architecture_cfg) -> None:
     pruner = PRUNERS.build(pruner_cfg)
     architecture = ARCHITECTURES.build(architecture_cfg)
     pruner.prepare_from_supernet(architecture)
-    
+
     pre_compactors_params = dict()
     for name, param in pruner._compactors.named_parameters():
         pre_compactors_params[name] = param.clone()
-        
+
     pruner.init_weights()
-    
+
     for name, param in pruner._compactors.named_parameters():
         assert torch.equal(pre_compactors_params[name], param)
-    
+
 
 def _test_resrep_pruner_when_insert_compactor(pruner_cfg,
                                               architecture_cfg,
