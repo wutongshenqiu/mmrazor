@@ -95,7 +95,9 @@ algorithm = dict(
         input_shape=(3, 224, 224),
         follow_paper=True),
     before_update_mask_iter=_iterations_per_epoch * 5,
-    mask_interval=200)
+    mask_interval=200,
+    retraining=True,
+    channel_cfg='work_dirs/resrep/channel_cfg.yaml')
 
 # TODO
 # same as pytorch?

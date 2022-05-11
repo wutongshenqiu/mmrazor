@@ -1,5 +1,4 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import copy
 from typing import Dict
 
 import torch
@@ -33,31 +32,13 @@ class ResRep(BaseAlgorithm):
             self.pruner = None
             return
 
-        # judge whether our StructurePruner can prune the architecture
-        try:
-            pseudo_pruner = build_pruner(pruner)
-            pseudo_architecture = copy.deepcopy(self.architecture)
-            pseudo_pruner.prepare_from_supernet(pseudo_architecture)
-            subnet_dict = pseudo_pruner.sample_subnet(pseudo_architecture)
-            pseudo_pruner.set_subnet(subnet_dict)
-            subnet_dict = pseudo_pruner.export_subnet()
-
-            pseudo_pruner.deploy_subnet(pseudo_architecture, subnet_dict)
-            pseudo_img = torch.randn(1, 3, 224, 224)
-            pseudo_architecture.forward_dummy(pseudo_img)
-        except RuntimeError:
-            raise NotImplementedError('Our current StructurePruner does not '
-                                      'support pruning this architecture. '
-                                      'StructurePruner is not perfect enough '
-                                      'to handle all the corner cases. We will'
-                                      ' appreciate it if you create a issue.')
-
         self.pruner: ResRepPruner = build_pruner(pruner)
         # BUG
         # train mode will affect batch normalization layers
-        self.pruner.eval()
-        self.architecture.eval()
+        self.eval()
         self.pruner.prepare_from_supernet(self.architecture)
+        if self.channel_cfg is not None:
+            self.pruner.deploy_subnet(self.architecture, self.channel_cfg)
 
     def train_step(self, data: Dict, optimizer: torch.optim.Optimizer) -> Dict:
         """Train step function.

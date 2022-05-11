@@ -599,7 +599,10 @@ class ResRepPruner(StructurePruner):
 
         for conv_name, cfg in channel_cfg.items():
             conv_module = get_module(model, conv_name)
-            conv_module.bias = torch.zeros_like(conv_module.weight.shape[0])
+            conv_module.bias = nn.Parameter(
+                torch.zeros(conv_module.weight.shape[0]))
+
+        delattr(self, '_compactors')
 
     # TODO: ugly hack
     # DDP bug
