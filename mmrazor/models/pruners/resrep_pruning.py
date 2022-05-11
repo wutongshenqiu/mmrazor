@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
-from functools import reduce
 from types import MethodType
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional
 
@@ -14,6 +13,7 @@ from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import PRUNERS
 from .structure_pruning import StructurePruner
 from .types import METRIC_DICT_TYPE, SUBNET_TYPE
+from .utils import replace_module
 
 
 def _print_debug_msg(*args, rank_idx: int = 0, **kwargs) -> None:
@@ -590,88 +590,14 @@ class ResRepPruner(StructurePruner):
     # should load channel that has been set to 0
     def deploy_subnet(self, supernet: BaseArchitecture,
                       channel_cfg: Dict[Hashable, Any]) -> None:
-        ...
+        model = supernet.model
+
+        identity_layer = channel_cfg.get('identity_layer')
+        if identity_layer is not None:
+            for layer_name in identity_layer:
+                replace_module(model, layer_name, nn.Identity())
 
     # TODO: ugly hack
     # DDP bug
     def forward(self, architecture: BaseArchitecture, data: Dict) -> Dict:
         return architecture(**data)
-
-    @staticmethod
-    def _fuse_conv_bn(conv: nn.Conv2d, bn: nn.BatchNorm2d) -> nn.Conv2d:
-        conv_w = conv.weight
-        conv_b = conv.bias if conv.bias is not None else torch.zeros_like(
-            bn.running_mean)
-
-        factor = bn.weight / torch.sqrt(bn.running_var + bn.eps)
-        conv.weight = nn.Parameter(
-            conv_w * factor.reshape([conv.out_channels, 1, 1, 1]))
-        conv.bias = nn.Parameter((conv_b - bn.running_mean) * factor + bn.bias)
-
-        return conv
-
-    @torch.no_grad()
-    def convert_compactor(self, supernet: BaseArchitecture) -> None:
-
-        def fold_conv(conv: nn.Conv2d,
-                      filtered_compactor_weight: torch.Tensor) -> nn.Conv2d:
-            conv_weight = conv.weight
-            new_conv_weight = F.conv2d(
-                conv_weight.permute(1, 0, 2, 3),
-                filtered_compactor_weight).permute(1, 0, 2, 3)
-
-            conv_bias = conv.bias
-            new_conv_bias = torch.zeros(filtered_compactor_weight.shape[0])
-            for i in range(new_conv_bias.shape[0]):
-                new_conv_bias[i] = conv_bias.dot(
-                    filtered_compactor_weight[i, :, 0, 0])
-
-            conv.weight = nn.Parameter(new_conv_weight)
-            conv.bias = nn.Parameter(new_conv_bias)
-
-            return conv
-
-        model = supernet.model
-        for compactor_name, conv_names in self._compactor2modules.items():
-            for conv_name in conv_names:
-                bn_name = self._conv_norm_links[conv_name]
-                conv_module = self.name2module[conv_name]
-                bn_module = self.name2module[bn_name]
-                fused_conv = self._fuse_conv_bn(conv_module, bn_module)
-
-                compactor = self._compactors[compactor_name]
-                filter_ids_l_threshold = compactor.filter_ids_l_threshold(
-                    self._threshold)
-                _print_debug_msg(
-                    f'conv: {conv_name}, pruned channels: '
-                    f'{len(filter_ids_l_threshold)}, total channels: '
-                    f'{compactor.weight.shape[0]}')
-                compactor.weight[filter_ids_l_threshold] = 0
-                folded_conv = fold_conv(fused_conv, compactor.weight)
-                _print_debug_msg(f'Reset conv: {conv_name}')
-                self._replace_module(model, conv_name, folded_conv)
-                # TODO
-                # replace bn layer with identity
-                _print_debug_msg(f'Replace bn: {bn_name} with identity')
-                self._replace_module(model, bn_name, nn.Identity())
-
-        delattr(self, '_compactors')
-
-        _print_debug_msg('convert compactors done.')
-
-    @staticmethod
-    def _get_parent_module_by_name(model: nn.Module,
-                                   module_name: str) -> nn.Module:
-        module_names = module_name.split('.')
-        if len(module_names) == 1:
-            return model
-        parent_module_names = module_names[:-1]
-
-        return reduce(getattr, parent_module_names, model)
-
-    def _replace_module(self, model: nn.Module, module_name: str,
-                        new_module: nn.Module) -> None:
-        parent_module = self._get_parent_module_by_name(model, module_name)
-        child_module_name = module_name.split('.')[-1]
-
-        setattr(parent_module, child_module_name, new_module)
