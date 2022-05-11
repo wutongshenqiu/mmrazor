@@ -13,7 +13,7 @@ from mmrazor.models.architectures.base import BaseArchitecture
 from mmrazor.models.builder import PRUNERS
 from .structure_pruning import StructurePruner
 from .types import METRIC_DICT_TYPE, SUBNET_TYPE
-from .utils import replace_module
+from .utils import get_module, replace_module
 
 
 def _print_debug_msg(*args, rank_idx: int = 0, **kwargs) -> None:
@@ -596,6 +596,10 @@ class ResRepPruner(StructurePruner):
         if identity_layer is not None:
             for layer_name in identity_layer:
                 replace_module(model, layer_name, nn.Identity())
+
+        for conv_name, cfg in channel_cfg.items():
+            conv_module = get_module(model, conv_name)
+            conv_module.bias = torch.zeros_like(conv_module.weight.shape[0])
 
     # TODO: ugly hack
     # DDP bug
