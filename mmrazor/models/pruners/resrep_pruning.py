@@ -621,8 +621,6 @@ class ResRepPruner(StructurePruner):
                     f'Slice in channels of {conv_name} to {in_channels}')
             conv_module.weight = nn.Parameter(weight)
 
-        delattr(self, '_compactors')
-
     # TODO: ugly hack
     # DDP bug
     def forward(self, architecture: BaseArchitecture, data: Dict) -> Dict:
