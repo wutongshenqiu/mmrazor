@@ -606,7 +606,7 @@ class ResRepPruner(StructurePruner):
             if out_channels is not None:
                 raw_out_channels = cfg.get('raw_out_channels')
                 assert weight.shape[0] == raw_out_channels
-                weight = weight[:out_channels, :, :, :]
+                weight = weight[:out_channels]
                 conv_module.out_channels = out_channels
                 conv_module.bias = nn.Parameter(torch.zeros(out_channels))
                 _print_debug_msg(
@@ -615,7 +615,7 @@ class ResRepPruner(StructurePruner):
             if in_channels is not None:
                 raw_in_channels = cfg.get('raw_in_channels')
                 assert weight.shape[1] == raw_in_channels
-                weight = weight[:, :in_channels, :, :]
+                weight = weight[:, :in_channels]
                 conv_module.in_channels = in_channels
                 _print_debug_msg(
                     f'Slice in channels of {conv_name} to {in_channels}')

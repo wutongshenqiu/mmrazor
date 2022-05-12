@@ -63,9 +63,9 @@ def _node2children(pruner: ResRepPruner) -> dict[str, List[str]]:
     for node, parents in node2parents.items():
         for p in parents:
             try:
-                node2parents[node].append(p)
+                node2children[p].append(node)
             except KeyError:
-                node2parents[node] = [p]
+                node2children[p] = [node]
 
     return node2children
 
@@ -96,7 +96,8 @@ def convert_compactor(pruner: ResRepPruner, model: nn.Module) -> Dict:
             filtered_compactor_weight = \
                 compactor.weight[filter_ids_ge_threshold]
             folded_conv = _fold_conv(fused_conv, filtered_compactor_weight)
-            print(f'Reset conv: {conv_name}')
+            print(f'Reset conv: {conv_name} with folded conv, shape: '
+                  f'{folded_conv.weight.shape}')
             replace_module(model, conv_name, folded_conv)
             # TODO
             # replace bn layer with identity

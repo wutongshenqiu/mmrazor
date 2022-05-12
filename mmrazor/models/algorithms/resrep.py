@@ -36,9 +36,10 @@ class ResRep(BaseAlgorithm):
         # BUG
         # train mode will affect batch normalization layers
         self.eval()
-        self.pruner.prepare_from_supernet(self.architecture)
         if hasattr(self, 'channel_cfg'):
             self.pruner.deploy_subnet(self.architecture, self.channel_cfg)
+        else:
+            self.pruner.prepare_from_supernet(self.architecture)
 
     def train_step(self, data: Dict, optimizer: torch.optim.Optimizer) -> Dict:
         """Train step function.
