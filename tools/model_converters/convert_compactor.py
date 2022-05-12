@@ -111,6 +111,11 @@ def convert_compactor(pruner: ResRepPruner, model: nn.Module) -> Dict:
 
             if conv_name in node2children:
                 for child_module_name in node2children[conv_name]:
+                    if child_module_name in channel_cfg:
+                        child_cfg = channel_cfg[child_module_name]
+                        if 'in_channels' in child_cfg:
+                            assert child_cfg[
+                                'in_channels'] == remained_channels
                     child_module = get_module(model, child_module_name)
                     in_channel_cfg = {
                         'raw_in_channels': child_module.weight.shape[1],
