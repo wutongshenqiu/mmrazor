@@ -1,7 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import torch
 from mmcv import Config, fileio
@@ -11,7 +11,7 @@ from torch.nn import functional as F
 
 from mmrazor.models import build_algorithm
 from mmrazor.models.pruners import ResRepPruner
-from mmrazor.models.pruners.utils import replace_module
+from mmrazor.models.pruners.utils import get_module, replace_module
 
 
 def parse_args():
@@ -56,10 +56,26 @@ def _fold_conv(conv: nn.Conv2d,
     return conv
 
 
+def _node2children(pruner: ResRepPruner) -> dict[str, List[str]]:
+    node2parents = pruner.node2parents
+    node2children = dict()
+
+    for node, parents in node2parents.items():
+        for p in parents:
+            try:
+                node2parents[node].append(p)
+            except KeyError:
+                node2parents[node] = [p]
+
+    return node2children
+
+
 @torch.no_grad()
 def convert_compactor(pruner: ResRepPruner, model: nn.Module) -> Dict:
     channel_cfg = dict()
 
+    node2children = _node2children(pruner)
+    print(node2children)
     for compactor_name, conv_names in pruner._compactor2modules.items():
         for conv_name in conv_names:
             bn_name = pruner._conv_norm_links[conv_name]
@@ -68,15 +84,18 @@ def convert_compactor(pruner: ResRepPruner, model: nn.Module) -> Dict:
             fused_conv = fuse_conv_bn(conv_module, bn_module)
 
             compactor = pruner._compactors[compactor_name]
-            filter_ids_l_threshold = compactor.filter_ids_l_threshold(
+            filter_ids_ge_threshold = compactor.filter_ids_ge_threshold(
                 pruner._threshold)
 
             raw_channels = compactor.weight.shape[0]
-            pruned_channels = len(filter_ids_l_threshold)
-            print(f'conv: {conv_name}, pruned channels: {pruned_channels}, '
-                  f'total channels: {raw_channels}')
-            compactor.weight[filter_ids_l_threshold] = 0
-            folded_conv = _fold_conv(fused_conv, compactor.weight)
+            remained_channels = len(filter_ids_ge_threshold)
+            assert remained_channels > 0
+            print(
+                f'conv: {conv_name}, remained channels: {remained_channels}, '
+                f'total channels: {raw_channels}')
+            filtered_compactor_weight = \
+                compactor.weight[filter_ids_ge_threshold]
+            folded_conv = _fold_conv(fused_conv, filtered_compactor_weight)
             print(f'Reset conv: {conv_name}')
             replace_module(model, conv_name, folded_conv)
             # TODO
@@ -85,16 +104,39 @@ def convert_compactor(pruner: ResRepPruner, model: nn.Module) -> Dict:
             replace_module(model, bn_name, nn.Identity())
 
             try:
-                channel_cfg['identity_layer'].append(bn_name)
+                channel_cfg['identity_layers'].append(bn_name)
             except KeyError:
-                channel_cfg['identity_layer'] = [bn_name]
-            raw_channels
-            channel_cfg[conv_name] = {
-                'raw_channels': raw_channels,
-                'remain_channels': raw_channels - pruned_channels
-            }
-    delattr(pruner, '_compactors')
+                channel_cfg['identity_layers'] = [bn_name]
 
+            if conv_name in node2children:
+                for child_module_name in node2children[conv_name]:
+                    child_module = get_module(model, child_module_name)
+                    in_channel_cfg = {
+                        'raw_in_channels': child_module.weight.shape[1],
+                        'in_channels': remained_channels
+                    }
+                    weight = \
+                        child_module.weight[:, filter_ids_ge_threshold, :, :]
+                    child_module.weight = nn.Parameter(weight)
+                    try:
+                        channel_cfg[child_module_name].update(in_channel_cfg)
+                    except KeyError:
+                        channel_cfg[child_module_name] = in_channel_cfg
+
+                    print(f'Reset in channel of {child_module_name} to: '
+                          f'{remained_channels} according to parent module: '
+                          f'{conv_name}')
+
+            out_channel_cfg = {
+                'raw_out_channels': raw_channels,
+                'out_channels': remained_channels
+            }
+            try:
+                channel_cfg[conv_name].update(out_channel_cfg)
+            except KeyError:
+                channel_cfg[conv_name] = out_channel_cfg
+
+    delattr(pruner, '_compactors')
     print('convert compactors done.')
 
     return channel_cfg

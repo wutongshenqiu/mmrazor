@@ -586,21 +586,40 @@ class ResRepPruner(StructurePruner):
     def export_subnet(self) -> Dict[Hashable, Any]:
         return super().export_subnet()
 
-    # TODO
-    # should load channel that has been set to 0
+    @torch.no_grad()
     def deploy_subnet(self, supernet: BaseArchitecture,
                       channel_cfg: Dict[Hashable, Any]) -> None:
         model = supernet.model
 
-        identity_layer = channel_cfg.get('identity_layer')
+        identity_layer = channel_cfg.pop('identity_layers', None)
         if identity_layer is not None:
             for layer_name in identity_layer:
                 replace_module(model, layer_name, nn.Identity())
+                _print_debug_msg(f'replace `{layer_name}` with Identity.')
 
         for conv_name, cfg in channel_cfg.items():
             conv_module = get_module(model, conv_name)
-            conv_module.bias = nn.Parameter(
-                torch.zeros(conv_module.weight.shape[0]))
+            assert isinstance(conv_module, nn.Conv2d)
+            weight = conv_module.weight
+
+            out_channels = cfg.get('out_channels')
+            if out_channels is not None:
+                raw_out_channels = cfg.get('raw_out_channels')
+                assert weight.shape[0] == raw_out_channels
+                weight = weight[:out_channels, :, :, :]
+                conv_module.out_channels = out_channels
+                conv_module.bias = nn.Parameter(torch.zeros(out_channels))
+                _print_debug_msg(
+                    f'Slice out channels of {conv_name} to {out_channels}')
+            in_channels = cfg.get('in_channels')
+            if in_channels is not None:
+                raw_in_channels = cfg.get('raw_in_channels')
+                assert weight.shape[1] == raw_in_channels
+                weight = weight[:, :in_channels, :, :]
+                conv_module.in_channels = in_channels
+                _print_debug_msg(
+                    f'Slice in channels of {conv_name} to {in_channels}')
+            conv_module.weight = nn.Parameter(weight)
 
         delattr(self, '_compactors')
 
