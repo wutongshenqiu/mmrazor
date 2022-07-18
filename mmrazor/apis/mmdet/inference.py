@@ -46,7 +46,8 @@ def init_mmdet_model(config: Union[str, mmcv.Config],
     model = algorithm.architecture.model
 
     if checkpoint is not None:
-        checkpoint = load_checkpoint(algorithm, checkpoint, map_location='cpu')
+        checkpoint: Dict = load_checkpoint(
+            algorithm, checkpoint, map_location='cpu')
         if 'CLASSES' in checkpoint.get('meta', {}):
             model.CLASSES = checkpoint['meta']['CLASSES']
         else:
