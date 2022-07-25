@@ -91,6 +91,8 @@ class AutoSlim(BaseAlgorithm):
         ) -> Dict[str, torch.Tensor]:
             with optim_wrapper.optim_context(
                     self), self.distiller.student_recorders:  # type: ignore
+                # record logits, hard loss has no effect
+                _ = self(batch_inputs, data_samples, mode='loss')
                 distill_losses = self(
                     batch_inputs, data_samples, mode='distill')
 
@@ -135,16 +137,11 @@ class AutoSlim(BaseAlgorithm):
                 data_samples: Optional[List[BaseDataElement]] = None,
                 mode: str = 'tensor') -> ForwardResults:
         if mode == 'distill':
-            return self.distill(batch_inputs, data_samples)
+            return self.distill()
         else:
             return super().forward(batch_inputs, data_samples, mode)
 
-    def distill(
-        self, batch_inputs: torch.Tensor,
-        data_samples: Optional[List[BaseDataElement]]
-    ) -> Dict[str, torch.Tensor]:
-        # record forward
-        _ = self(batch_inputs, data_samples, mode='loss')
+    def distill(self) -> Dict[str, torch.Tensor]:
         soft_loss = self.distiller.compute_distill_losses()
 
         return soft_loss
@@ -174,6 +171,8 @@ class AutoSlimDDP(MMDistributedDataParallel):
             with optim_wrapper.optim_context(
                     self
             ), self.module.distiller.student_recorders:  # type: ignore
+                # record logits, hard loss has no effect
+                _ = self(batch_inputs, data_samples, mode='loss')
                 distill_losses = self(
                     batch_inputs, data_samples, mode='distill')
 
@@ -227,3 +226,7 @@ class AutoSlimDDP(MMDistributedDataParallel):
         assert isinstance(val, bool)
 
         self.module._optim_wrapper_count_status_reinitialized = val
+
+    @property
+    def distiller(self) -> ConfigurableDistiller:
+        return self.module.distiller
