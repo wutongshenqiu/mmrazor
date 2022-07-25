@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Union
 
 import torch
 from mmengine import BaseDataElement
+from mmengine.dist import broadcast_object_list
 from mmengine.model import BaseModel, MMDistributedDataParallel
 from mmengine.optim import OptimWrapper
 from torch import nn
@@ -15,7 +16,7 @@ from mmrazor.models.utils import (add_prefix,
                                   reinitialize_optim_wrapper_count_status)
 from mmrazor.registry import MODEL_WRAPPERS, MODELS
 from mmrazor.utils import SingleMutatorRandomSubnet
-from ..base import BaseAlgorithm
+from ..base import BaseAlgorithm, ForwardResults
 
 VALID_MUTATOR_TYPE = Union[OneShotChannelMutator, Dict]
 VALID_DISTILLER_TYPE = Union[ConfigurableDistiller, Dict]
@@ -88,19 +89,15 @@ class AutoSlim(BaseAlgorithm):
         def distill_step(
                 batch_inputs: torch.Tensor, data_samples: List[BaseDataElement]
         ) -> Dict[str, torch.Tensor]:
-            subnet_losses = dict()
             with optim_wrapper.optim_context(
                     self), self.distiller.student_recorders:  # type: ignore
-                hard_loss = self(batch_inputs, data_samples, mode='loss')
-                soft_loss = self.distiller.compute_distill_losses()
+                distill_losses = self(
+                    batch_inputs, data_samples, mode='distill')
 
-                subnet_losses.update(hard_loss)
-                subnet_losses.update(soft_loss)
+                parsed_distill_losses, _ = self.parse_losses(distill_losses)
+                optim_wrapper.update_params(parsed_distill_losses)
 
-                parsed_subnet_losses, _ = self.parse_losses(subnet_losses)
-                optim_wrapper.update_params(parsed_subnet_losses)
-
-            return subnet_losses
+            return distill_losses
 
         if not self._optim_wrapper_count_status_reinitialized:
             reinitialize_optim_wrapper_count_status(
@@ -133,6 +130,25 @@ class AutoSlim(BaseAlgorithm):
 
         return total_losses
 
+    def forward(self,
+                batch_inputs: torch.Tensor,
+                data_samples: Optional[List[BaseDataElement]] = None,
+                mode: str = 'tensor') -> ForwardResults:
+        if mode == 'distill':
+            return self.distill(batch_inputs, data_samples)
+        else:
+            return super().forward(batch_inputs, data_samples, mode)
+
+    def distill(
+        self, batch_inputs: torch.Tensor,
+        data_samples: Optional[List[BaseDataElement]]
+    ) -> Dict[str, torch.Tensor]:
+        # record forward
+        _ = self(batch_inputs, data_samples, mode='loss')
+        soft_loss = self.distiller.compute_distill_losses()
+
+        return soft_loss
+
 
 @MODEL_WRAPPERS.register_module()
 class AutoSlimDDP(MMDistributedDataParallel):
@@ -140,11 +156,14 @@ class AutoSlimDDP(MMDistributedDataParallel):
     def __init__(self,
                  *,
                  device_ids: Optional[Union[List, int, torch.device]] = None,
+                 broadcast_random_subnet: bool = False,
                  **kwargs) -> None:
         if device_ids is None:
             if os.environ.get('LOCAL_RANK') is not None:
                 device_ids = [int(os.environ['LOCAL_RANK'])]
         super().__init__(device_ids=device_ids, **kwargs)
+
+        self._broadcast_random_subnet = broadcast_random_subnet
 
     def train_step(self, data: List[dict],
                    optim_wrapper: OptimWrapper) -> Dict[str, torch.Tensor]:
@@ -152,21 +171,17 @@ class AutoSlimDDP(MMDistributedDataParallel):
         def distill_step(
                 batch_inputs: torch.Tensor, data_samples: List[BaseDataElement]
         ) -> Dict[str, torch.Tensor]:
-            subnet_losses = dict()
             with optim_wrapper.optim_context(
                     self
             ), self.module.distiller.student_recorders:  # type: ignore
-                hard_loss = self(batch_inputs, data_samples, mode='loss')
-                soft_loss = self.module.distiller.compute_distill_losses()
+                distill_losses = self(
+                    batch_inputs, data_samples, mode='distill')
 
-                subnet_losses.update(hard_loss)
-                subnet_losses.update(soft_loss)
+                parsed_distill_losses, _ = self.module.parse_losses(
+                    distill_losses)
+                optim_wrapper.update_params(parsed_distill_losses)
 
-                parsed_subnet_losses, _ = self.module.parse_losses(
-                    subnet_losses)
-                optim_wrapper.update_params(parsed_subnet_losses)
-
-            return subnet_losses
+            return distill_losses
 
         if not self._optim_wrapper_count_status_reinitialized:
             reinitialize_optim_wrapper_count_status(
@@ -192,7 +207,10 @@ class AutoSlimDDP(MMDistributedDataParallel):
         total_losses.update(add_prefix(min_subnet_losses, 'min_subnet'))
 
         for sample_idx in range(self.module.num_samples):
-            self.module.set_subnet(self.module.sample_subnet())
+            random_subnet = self.module.sample_subnet()
+            if self._broadcast_random_subnet:
+                broadcast_object_list(random_subnet, src=0)
+            self.module.set_subnet(random_subnet)
             random_subnet_losses = distill_step(batch_inputs, data_samples)
             total_losses.update(
                 add_prefix(random_subnet_losses,

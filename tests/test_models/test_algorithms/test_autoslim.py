@@ -88,13 +88,10 @@ class TestAutoSlim(TestCase):
         assert not algo._optim_wrapper_count_status_reinitialized
         losses = algo.train_step(data, optim_wrapper)
 
-        assert len(losses) == 7
+        assert len(losses) == 4
         assert losses['max_subnet.loss'] > 0
-        assert losses['min_subnet.loss'] > 0
         assert losses['min_subnet.loss_kl'] > 0
-        assert losses['random_subnet_0.loss'] > 0
         assert losses['random_subnet_0.loss_kl'] > 0
-        assert losses['random_subnet_1.loss'] > 0
         assert losses['random_subnet_1.loss_kl'] > 0
 
         assert algo._optim_wrapper_count_status_reinitialized
