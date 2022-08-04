@@ -3,8 +3,6 @@ _base_ = [
     'mmcls::_base_/default_runtime.py',
 ]
 
-default_scope = 'mmrazor'
-
 # !dataset config
 # ==========================================================================
 # data preprocessor
@@ -46,6 +44,7 @@ supernet = dict(
 # !autoslim algorithm config
 num_samples = 2
 model = dict(
+    _scope_='mmrazor',
     type='BigNAS',
     num_samples=num_samples,
     architecture=supernet,
@@ -67,7 +66,10 @@ model = dict(
         value_mutator=dict(type='DynamicValueMutator')))
 
 model_wrapper_cfg = dict(
-    type='BigNASDDP', broadcast_buffers=False, find_unused_parameters=True)
+    _scope_='mmrazor',
+    type='BigNASDDP',
+    broadcast_buffers=False,
+    find_unused_parameters=True)
 
 optim_wrapper = dict(accumulative_counts=num_samples + 2)
 
@@ -77,5 +79,7 @@ param_scheduler = dict(end=max_epochs)
 
 # train, val, test setting
 train_cfg = dict(max_epochs=max_epochs)
-val_cfg = dict(type='AutoSlimValLoop', calibrated_sample_nums=4096)
-test_cfg = dict(type='AutoSlimTestLoop', calibrated_sample_nums=4096)
+val_cfg = dict(
+    _scope_='mmrazor', type='AutoSlimValLoop', calibrated_sample_nums=4096)
+test_cfg = dict(
+    _scope_='mmrazor', type='AutoSlimTestLoop', calibrated_sample_nums=4096)

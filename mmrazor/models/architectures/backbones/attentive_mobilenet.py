@@ -5,7 +5,6 @@ from typing import List, Optional, Sequence, Tuple
 import torch.nn as nn
 from mmcls.models.backbones.base_backbone import BaseBackbone
 from mmcls.models.utils import make_divisible
-from mmcls.registry import MODELS
 from mmcv.cnn import ConvModule
 from mmengine.model import Sequential
 from torch.nn.modules.batchnorm import _BatchNorm
@@ -14,6 +13,7 @@ from mmrazor.models.architectures.dynamic_op import DynamicSequential
 from mmrazor.models.mutables import OneShotMutableChannel, OneShotMutableValue
 from mmrazor.models.mutables.base_mutable import BaseMutable
 from mmrazor.models.ops.gml_mobilenet_series import GMLMBBlock, GMLSELayer
+from mmrazor.registry import MODELS
 
 
 def _range_to_list(range_: List[int]) -> List[int]:
