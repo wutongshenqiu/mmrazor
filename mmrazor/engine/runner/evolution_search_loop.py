@@ -21,8 +21,10 @@ from mmrazor.utils import SupportRandomSubnet
 from .utils import crossover
 
 
+from .mixins import CalibrateBNMixin
+
 @LOOPS.register_module()
-class EvolutionSearchLoop(EpochBasedTrainLoop):
+class EvolutionSearchLoop(EpochBasedTrainLoop, CalibrateBNMixin):
     """Loop for evolution searching.
 
     Args:
@@ -92,6 +94,7 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
         self.mutate_prob = mutate_prob
         self.max_keep_ckpts = max_keep_ckpts
         self.resume_from = resume_from
+        self.fp16 = False
 
         if init_candidates is None:
             self.candidates = Candidates()
@@ -175,6 +178,7 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
         top-k candicates."""
         for i, candidate in enumerate(self.candidates.subnets):
             self.model.set_subnet(candidate)
+            self.calibrate_bn_statistics(self.runner.train_dataloader, 4096)
             metrics = self._val_candidate()
             score = metrics[self.score_key] \
                 if len(metrics) != 0 else 0.
