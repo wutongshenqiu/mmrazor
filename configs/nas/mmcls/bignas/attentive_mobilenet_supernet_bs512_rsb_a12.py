@@ -168,8 +168,20 @@ model_wrapper_cfg = dict(
 # ==========================================================================
 optim_wrapper = dict(
     optimizer=dict(type='Lamb', lr=0.005, weight_decay=0.01),
+    clip_grad=dict(clip_value=1.0), # mmengine/mmengine/optim/optimizer/optimizer_wrapper.py'
     paramwise_cfg=dict(bias_decay_mult=0., norm_decay_mult=0.),
     accumulative_counts=num_samples + 2)
+
+# ```python
+#             # clip_type = grad_clip.pop('clip_type', 'by_norm')
+#             # if clip_type == 'by_norm':
+#             #     return clip_grad.clip_grad_norm_(params, **grad_clip)
+#             # elif clip_type == 'by_value':
+#             #     return clip_grad.clip_grad_value_(params, **grad_clip)
+#             # else:
+#             #     raise ValueError(f'Unsupporsed clip_type: {clip_type}')
+# ````
+
 # NOTE: `auto_scale_lr` is for automatically scaling LR,
 # based on the actual training batch size.
 auto_scale_lr = dict(base_batch_size=64 * 8)
